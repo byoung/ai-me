@@ -1,0 +1,24 @@
+[project]
+name = "ai-me"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "~=3.12.0"
+dependencies = [
+    "chromadb~=1.1",
+    "gradio~=5.47",
+    "ipykernel~=6.30",
+    "ipywidgets~=8.1",
+    "langchain~=0.3",
+    "langchain-chroma~=0.2",
+    "langchain-community~=0.3",
+    "langchain-huggingface~=0.3",
+    "langchain-mcp-adapters~=0.1",
+    "langgraph~=0.6",
+    "ollama~=0.6",
+    "openai~=1.109",
+    "openai-agents~=0.3.2",
+    "pip~=25.2",
+    "python-dotenv~=1.1",
+    "sentence-transformers~=5.1",
+]

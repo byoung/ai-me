@@ -1,0 +1,17 @@
+services:
+  browser:
+    image: mcr.microsoft.com/playwright:v1.55.0-noble
+
+  notebooks:
+    build: .
+    # This ensures changes inside our container are propagated to the host machine
+    volumes:
+      - ./:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 7861:7861
+    working_dir: /app
+    user: "0:0"
+
+
+     
