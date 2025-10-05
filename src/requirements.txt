@@ -243,9 +243,9 @@ multidict==6.6.4
     #   yarl
 mypy-extensions==1.1.0
     # via typing-inspect
-networkx==3.5
+networkx==3.4.2
     # via torch
-numpy==2.3.3
+numpy==2.2.6
     # via
     #   chromadb
     #   gradio
@@ -476,7 +476,7 @@ safetensors==0.6.2
     # via transformers
 scikit-learn==1.7.2
     # via sentence-transformers
-scipy==1.16.2
+scipy==1.15.3
     # via
     #   scikit-learn
     #   sentence-transformers

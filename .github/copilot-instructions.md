@@ -158,6 +158,7 @@ async def get_local_info(query: str) -> str:
 3. **ChromaDB persistence**: EphemeralClient means vectorstore rebuilt on restart
 4. **MCP server lifecycle**: Must `await server.connect()` after initialization
 5. **Notebooks vs app.py**: Notebooks have active MCP servers for testing; `app.py` has them disabled due to undesired loop behavior with current agent prompts
+6. **Hugging Face Spaces**: For some reason the python packages on huggingface spaces are slightly out of date (e.g. `networkx` 3.4.2 vs 3.5). If you hit weird dependency issues during `gradio deploy`, pin the versions in `src/requirements.txt` accordingly.
 
 ## File Organization
 
