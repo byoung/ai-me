@@ -145,7 +145,7 @@ class DataManager:
             repos = self.github_repos
         
         if file_filter is None:
-            file_filter = lambda fp: fp.endswith(".md") and "website" in fp
+            file_filter = lambda fp: fp.endswith(".md")
         
         all_docs = []
 
@@ -201,8 +201,7 @@ class DataManager:
                     rf'\1https://github.com/{repo}/tree/main\2',
                     doc.page_content
                 )
-                print(doc.page_content)  # Debug print to verify link replacement
-            
+                            
             processed.append(doc)
         
         return processed
