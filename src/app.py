@@ -80,6 +80,9 @@ async def get_local_info(query: str) -> str:
     in all things technology."""
     print("QUERY:", query)
     retrieved_docs = vectorstore.similarity_search(query)
+    print(f"Retrieved {len(retrieved_docs)} documents from vector store.")
+    for doc in retrieved_docs:
+        print(f" - {doc.metadata['source']}")
     docs_content = "\n\n".join(doc.page_content for doc in retrieved_docs)
 
     return docs_content
