@@ -82,7 +82,7 @@ async def get_local_info(query: str) -> str:
     retrieved_docs = vectorstore.similarity_search_with_score(query)
     print(f"Retrieved {len(retrieved_docs)} documents from vector store.")
     for doc, score in retrieved_docs:
-        source_link = f"https://github.com/{doc.metadata['github_repo']}/tree/main/{doc.metadata['file_path']}"
+        source_link = f"https://github.com/{doc.metadata['github_repo']}/tree/main/{doc.metadata['file_path']}\n"
 
         print(f" ------------ {source_link} -------------------- ")
         print(f" ------------ {score}       -------------------- ")
@@ -147,7 +147,13 @@ async def chat(user_input: str, history):
     return result.final_output
 
 if __name__ == "__main__":
-    # Launch Gradio; MCP servers are initialized lazily inside chat()
-    gradio.ChatInterface(chat, type="messages").launch()
+    with gradio.Blocks(theme=gradio.themes.Ocean()) as ui:
 
+        gradio.Markdown("""# Welcome to BenBot
+                        The digital version of Ben Young -- software engineer, architect, technology leader and enthusiast.
+                        The digital assistant that you never knew you needed ;)
+                        Feel free to ask me anything about my experience, skills, projects, and interests.
+                        """)
+        gradio.ChatInterface(chat, type="messages")
 
+    ui.launch()
