@@ -35,7 +35,7 @@ class Config(BaseSettings):
     
     # Optional Environment Variables
     bot_full_name: str = Field(
-        default="Benjamin Young",
+        default="Ben Young",
         description="Full name of the bot persona",
     )
     
