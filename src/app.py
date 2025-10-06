@@ -8,10 +8,11 @@ from data import DataManager
 from agents.mcp import MCPServerStdio
 
 # Agents
-from agents import Runner, Agent, Tool
+from agents import Runner, Agent, Tool, FunctionTool, function_tool
 
 # UI
 import gradio
+
 
 ###################
 # Download, Load, Chunk, Vectorize and Store md files in Chroma
@@ -71,19 +72,25 @@ async def ensure_mcp_servers():
     if mcp_servers is None:
         mcp_servers = await setup_mcp_servers()
 
-from agents import FunctionTool, function_tool
-
 @function_tool
 async def get_local_info(query: str) -> str:
     """get more context based on the subject of the question.
     Our vector store will contain information about our personal and professional experience
     in all things technology."""
     print("QUERY:", query)
-    retrieved_docs = vectorstore.similarity_search(query)
+    docs_content = ""
+    retrieved_docs = vectorstore.similarity_search_with_score(query)
     print(f"Retrieved {len(retrieved_docs)} documents from vector store.")
-    for doc in retrieved_docs:
-        print(f" - {doc.metadata['source']}")
-    docs_content = "\n\n".join(doc.page_content for doc in retrieved_docs)
+    for doc, score in retrieved_docs:
+        source_link = f"https://github.com/{doc.metadata['github_repo']}/tree/main/{doc.metadata['file_path']}"
+
+        print(f" ------------ {source_link} -------------------- ")
+        print(f" ------------ {score}       -------------------- ")
+        print(f" {doc.page_content[:2000]}...")
+        print( " ----------------------------------------------- ")
+    
+        if(score < 1.6):
+            docs_content += f"Source: {source_link}" + doc.page_content + "\n\n"
 
     return docs_content
 

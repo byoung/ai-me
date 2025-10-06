@@ -16,7 +16,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 import chromadb
 from chromadb.config import Settings
-
+import shutil
 
 class DataManager:
     """
@@ -148,6 +148,12 @@ class DataManager:
             file_filter = lambda fp: fp.endswith(".md")
         
         all_docs = []
+        # Clean up tmp directory before loading
+        tmp_dir = "./tmp"
+
+        if os.path.exists(tmp_dir):
+            print(f"Cleaning up existing tmp directory: {tmp_dir}")
+            shutil.rmtree(tmp_dir)
 
         print(f"Loading GitHub documents from {len(repos)} repos {repos}")
         for repo in repos:
@@ -155,7 +161,7 @@ class DataManager:
             try:
                 loader = GitLoader(
                     clone_url=f"https://github.com/{repo}",
-                    repo_path=f"./tmp/{repo}",
+                    repo_path=f"{tmp_dir}/{repo}",
                     file_filter=file_filter,
                     branch="main",
                 )

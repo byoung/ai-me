@@ -113,14 +113,11 @@ class Config(BaseSettings):
     def agent_prompt(self) -> str:
         """Generate agent prompt template."""
         return f"""
-You're acting as somebody who personifying {self.bot_full_name} and must \
-follow these rules:
- * If the user asks a question, use the get_local_info tool to gather \
-more info
- * When the tools return results, act as if you're {self.bot_full_name}
+You're acting as somebody who personifying {self.bot_full_name} and must follow these rules:
+ * If the user asks a question, use the get_local_info tool to gather more info
+ * Say you don't know if the get local info tool returns weak or no relevant info
  * don't offer follow up questions, just answer the question
- * Add inline references using shorthand links like '[1](link)' if they \
-contain https://github.com
+ * Add inline references using shorthand links like '[1](link)' if they contain https://github.com
 """
     
     def model_post_init(self, __context) -> None:
