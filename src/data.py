@@ -1,7 +1,6 @@
 """
-Document loading, processing, and vectorstore management for ai-me application.
-Handles loading from local directories and GitHub repositories, chunking,
-and creating ChromaDB vectorstores.
+Document loading, processing, and vectorstore management for ai-me application. Handles loading
+from local directories and GitHub repositories, chunking, and creating ChromaDB vector stores.
 """
 import os
 from typing import List, Optional, Callable
@@ -10,30 +9,26 @@ from langchain_community.document_loaders import (
     TextLoader,
     GitLoader,
 )
-from langchain_text_splitters import CharacterTextSplitter
+from langchain_text_splitters import MarkdownTextSplitter, MarkdownHeaderTextSplitter
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 import chromadb
 from chromadb.config import Settings
 import shutil
+import re
 
 class DataManager:
     """
-    Consolidated document loading, processing, and vectorstore management.
-    
-    Handles the complete data pipeline from loading documents to creating
-    a queryable vectorstore. Configuration parameters have sensible defaults
-    and can be overridden as needed.
+    Consolidated document loading, processing, and vectorstore management. Handles the complete
+    data pipeline from loading documents to creating a queryable vectorstore. Configuration
+    parameters have sensible defaults and can be overridden as needed.
     """
     
-    # Class-level configuration defaults
-    # Compute doc_root relative to this file's parent directory
-    DEFAULT_DOC_ROOT = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "docs")
-    ) + "/"
-    DEFAULT_CHUNK_SIZE = 1200
-    DEFAULT_CHUNK_OVERLAP = 200
+    # Class-level configuration defaults. Compute doc_root relative to this file's parent dir.
+    DEFAULT_DOC_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docs")) + "/"
+    DEFAULT_CHUNK_SIZE = 2500
+    DEFAULT_CHUNK_OVERLAP = 0
     DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
     DEFAULT_DB_NAME = "ai_me"
     
@@ -52,31 +47,20 @@ class DataManager:
         
         Args:
             doc_load_local: Glob patterns for local docs (e.g., ["*.md"])
-            github_repos: List of GitHub repos (format: owner/repo)
-                         (default: [])
-            doc_root: Root directory for local documents 
-                     (default: ./docs/)
-            chunk_size: Character chunk size for splitting 
-                       (default: 1200)
-            chunk_overlap: Character overlap between chunks 
-                          (default: 200)
-            embedding_model: HuggingFace embedding model name
-                            (default: sentence-transformers/all-MiniLM-L6-v2)
-            db_name: ChromaDB collection name 
-                    (default: "ai_me")
+            github_repos: List of GitHub repos (format: owner/repo) (default: [])
+            doc_root: Root directory for local documents (default: ./docs/)
+            chunk_size: Character chunk size for splitting (default: 1200)
+            chunk_overlap: Character overlap between chunks (default: 200)
+            embedding_model: HuggingFace model (default: sentence-transformers/all-MiniLM-L6-v2)
+            db_name: ChromaDB collection name (default: "ai_me")
         """
         self.doc_load_local = doc_load_local
         self.github_repos = github_repos or []
         self.doc_root = doc_root or self.DEFAULT_DOC_ROOT
         self.chunk_size = chunk_size or self.DEFAULT_CHUNK_SIZE
         self.chunk_overlap = chunk_overlap or self.DEFAULT_CHUNK_OVERLAP
-        self.embedding_model = (
-            embedding_model or self.DEFAULT_EMBEDDING_MODEL
-        )
+        self.embedding_model = embedding_model or self.DEFAULT_EMBEDDING_MODEL
         self.db_name = db_name or self.DEFAULT_DB_NAME
-        
-        # Derived properties
-        self.doc_type = os.path.basename(self.doc_root)
         
         # Internal state
         self._vectorstore: Optional[Chroma] = None
@@ -84,19 +68,13 @@ class DataManager:
     
     def load_local_documents(self) -> List[Document]:
         """
-        Load documents from local directory.
-        
-        Returns:
-            List of loaded documents (empty list if directory not found)
+        Load documents from local directory. Returns empty list if directory not found.
         """
         print(f"Loading local documents from: {self.doc_root}")
         
         # Check if directory exists first
         if not os.path.exists(self.doc_root):
-            print(
-                f"Warning: Directory not found: {self.doc_root}"
-                f" - skipping local documents"
-            )
+            print(f"Warning: Directory not found: {self.doc_root} - skipping local documents")
             return []
         
         all_documents = []
@@ -124,34 +102,37 @@ class DataManager:
         print(f"Loaded {len(all_documents)} total local documents.")
         return all_documents
     
-    def load_github_documents(
-        self,
-        repos: List[str] = None,
-        file_filter: Optional[Callable[[str], bool]] = None
+    def load_github_documents(self, repos: List[str] = None,
+        file_filter: Optional[Callable[[str], bool]] = None, cleanup_tmp: bool = True
     ) -> List[Document]:
         """
         Load documents from GitHub repositories.
         
         Args:
-            repos: List of repos (owner/repo format). 
-                   Defaults to github_repos from init
-            file_filter: Optional filter function for files.
-                        Defaults to .md files in website/ paths
+            repos: List of repos (owner/repo format). Defaults to github_repos from init.
+            file_filter: Optional filter function for files. Defaults to .md files.
+            cleanup_tmp: If True, remove tmp directory before loading.
         
         Returns:
-            List of loaded documents from all repos
+            List of loaded documents from all repos.
         """
         if repos is None:
             repos = self.github_repos
         
         if file_filter is None:
-            file_filter = lambda fp: fp.endswith(".md")
+            def file_filter(fp: str) -> bool:
+                fp_lower = fp.lower()
+                basename = os.path.basename(fp).lower()
+                keep = (fp_lower.endswith(".md") and 
+                    basename not in ["contributing.md", "code_of_conduct.md", "security.md", 
+                                     "readme.md"])
+                return keep
         
         all_docs = []
         # Clean up tmp directory before loading
         tmp_dir = "./tmp"
 
-        if os.path.exists(tmp_dir):
+        if os.path.exists(tmp_dir) and cleanup_tmp:
             print(f"Cleaning up existing tmp directory: {tmp_dir}")
             shutil.rmtree(tmp_dir)
 
@@ -182,7 +163,7 @@ class DataManager:
     
     def process_documents(self, docs: List[Document]) -> List[Document]:
         """
-        Process documents by adding metadata and fixing links.
+        Hydrate links in markdown documents to point to GitHub.
         
         Args:
             docs: List of documents to process
@@ -193,20 +174,16 @@ class DataManager:
         processed = []
         for doc in docs:
             print(f"Processing: {doc.metadata['source']}")
-            doc.metadata["doc_type"] = self.doc_type
             
             # Fix baseless links to point to GitHub (if from a GitHub repo)
             if "github_repo" in doc.metadata:
                 repo = doc.metadata["github_repo"]
-                # Replace relative paths like /website/ or /docs/ 
-                # with full GitHub URLs
-                import re
-                # Find patterns like /path/ at start of line or after spaces
-                doc.page_content = re.sub(
-                    r'(\s|^)(/[a-zA-Z0-9_-]+/)',
-                    rf'\1https://github.com/{repo}/tree/main\2',
-                    doc.page_content
-                )
+                # First pass: fix absolute paths like /website/ or /docs/ typically used in short links
+                doc.page_content = re.sub(r'(\s|^)(/[a-zA-Z0-9_-]+/)',
+                    rf'\1https://github.com/{repo}/tree/main\2', doc.page_content)
+                # Second pass: fix inline markdown links like [text](/path/file.md)
+                doc.page_content = re.sub(r'\[([^\]]+)\]\((/[^)]+\.md(?:#[^)]+)?)\)',
+                    rf'[\1](https://github.com/{repo}/blob/main\2)', doc.page_content)
                             
             processed.append(doc)
         
@@ -214,42 +191,55 @@ class DataManager:
     
     def chunk_documents(self, documents: List[Document]) -> List[Document]:
         """
-        Split documents into smaller chunks for better retrieval.
+        Split documents into smaller chunks for better retrieval. Uses header-based splitting to
+        preserve document structure, then further splits by size if needed.
         
         Args:
             documents: List of documents to chunk
             
         Returns:
-            List of chunked documents
+            List of chunked documents with both original metadata and header metadata
         """
         print(f"Chunking {len(documents)} documents...")
         
-        text_splitter = CharacterTextSplitter(
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap,
-            separator="\n"
-        )
+        # Define headers to split on (h1, h2, h3)
+        headers_to_split_on = [("#", "Header 1"), ("##", "Header 2"), ("###", "Header 3")]
+        header_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on, 
+            strip_headers=False)
         
-        chunks = text_splitter.split_documents(documents)
-        print(f"Created {len(chunks)} chunks")
-        return chunks
+        all_chunks = []
+        for doc in documents:
+            # Split by headers first - this returns Documents with header metadata
+            header_chunks = header_splitter.split_text(doc.page_content)
+            
+            # Convert to Documents and preserve original metadata + add header metadata
+            for chunk in header_chunks:
+                # Create new Document with combined metadata
+                new_doc = Document(
+                    page_content=chunk.page_content,
+                    metadata={**doc.metadata, **chunk.metadata}  # Merge original + header metadata
+                )
+                all_chunks.append(new_doc)
+        
+        # Optional: Further split large chunks if they exceed size limit
+        size_splitter = MarkdownTextSplitter(chunk_size=DataManager.DEFAULT_CHUNK_SIZE)
+        final_chunks = size_splitter.split_documents(all_chunks)
+        
+        print(f"Created {len(final_chunks)} chunks")
+        return final_chunks
     
-    def load_and_process_all(
-        self,
-        include_local: bool = True,
-        include_github: bool = True,
-        github_repos: List[str] = None
-    ) -> List[Document]:
+    def load_and_process_all(self, include_local: bool = True, include_github: bool = True,
+        github_repos: List[str] = None) -> List[Document]:
         """
         Load, process, and chunk all documents.
         
         Args:
-            include_local: Whether to load local documents
-            include_github: Whether to load GitHub documents
-            github_repos: Optional list of specific repos to load
+            include_local: Whether to load local documents.
+            include_github: Whether to load GitHub documents.
+            github_repos: Optional list of specific repos to load.
         
         Returns:
-            List of processed and chunked documents
+            List of processed and chunked documents.
         """
         all_docs = []
         
@@ -273,32 +263,24 @@ class DataManager:
         """
         if self._embeddings is None:
             print(f"Loading embeddings model: {self.embedding_model}")
-            self._embeddings = HuggingFaceEmbeddings(
-                model_name=self.embedding_model
-            )
+            self._embeddings = HuggingFaceEmbeddings(model_name=self.embedding_model)
         return self._embeddings
     
-    def create_vectorstore(
-        self,
-        chunks: List[Document],
-        reset: bool = True
-    ) -> Chroma:
+    def create_vectorstore(self, chunks: List[Document], reset: bool = True) -> Chroma:
         """
         Create ChromaDB vectorstore from document chunks.
         
         Args:
-            chunks: List of document chunks to store
-            reset: If True, drop existing collection before creating
+            chunks: List of document chunks to store.
+            reset: If True, drop existing collection before creating.
         
         Returns:
-            Chroma vectorstore instance
+            Chroma vectorstore instance.
         """
         embeddings = self.get_embeddings()
         
         # Use EphemeralClient for faster in-memory storage
-        chroma_client = chromadb.EphemeralClient(
-            Settings(anonymized_telemetry=False)
-        )
+        chroma_client = chromadb.EphemeralClient(Settings(anonymized_telemetry=False))
         
         # Drop existing collection if requested
         if reset:
@@ -322,33 +304,52 @@ class DataManager:
         self._vectorstore = vectorstore
         return vectorstore
     
-    def setup_vectorstore(
-        self,
-        include_local: bool = True,
-        include_github: bool = True,
-        github_repos: List[str] = None,
-        reset: bool = True
-    ) -> Chroma:
+    def setup_vectorstore(self, include_local: bool = True, include_github: bool = True,
+        github_repos: List[str] = None, reset: bool = True) -> Chroma:
         """
         Complete pipeline: load, process, chunk, and create vectorstore.
         
         Args:
-            include_local: Whether to load local documents
-            include_github: Whether to load GitHub documents
-            github_repos: Optional list of specific repos to load
-            reset: If True, drop existing collection before creating
+            include_local: Whether to load local documents.
+            include_github: Whether to load GitHub documents.
+            github_repos: Optional list of specific repos to load.
+            reset: If True, drop existing collection before creating.
         
         Returns:
-            Chroma vectorstore instance ready for queries
+            Chroma vectorstore instance ready for queries.
         """
         print("Setting up vectorstore...")
-        chunks = self.load_and_process_all(
-            include_local=include_local,
-            include_github=include_github,
-            github_repos=github_repos
-        )
+        chunks = self.load_and_process_all(include_local=include_local,
+            include_github=include_github, github_repos=github_repos)
         return self.create_vectorstore(chunks, reset=reset)
     
+    def show_docs_for_file(self, filename: str):
+        """
+        Retrieve and print chunks from the vectorstore whose metadata['file_path'] ends with the
+        given filename. Returns a list of (doc_id, metadata, document).
+        """
+        all_docs = self._vectorstore.get()
+        print(f"Searching for chunks from file: {filename}")
+
+        ids = all_docs.get("ids", [])
+        metadatas = all_docs.get("metadatas", [])
+        documents = all_docs.get("documents", [])
+
+        matched = [
+            (doc_id, metadata, doc)
+            for doc_id, metadata, doc in zip(ids, metadatas, documents)
+            if metadata.get("file_path", "").endswith(filename)
+        ]
+
+        print(f"Found {len(matched)} chunks from {filename}:\n")
+        for i, (doc_id, metadata, content) in enumerate(matched, 1):
+            print("=" * 100)
+            print(f"CHUNK {i}")
+            print(f"Metadata: {metadata}")
+            print("=" * 100)
+            print(content)
+            print()
+
     @property
     def vectorstore(self) -> Optional[Chroma]:
         """Get the current vectorstore instance."""

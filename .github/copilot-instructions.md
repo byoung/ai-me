@@ -36,6 +36,12 @@ This is a personal AI agent application that creates an agentic version of real 
 
 ## Development Workflow
 
+### Formatting Instructions
+
+- Only break if the line is longer than 100 characters.
+- try to keep function calls on a single line if possible.
+- use the full 100 characters for comments and docstrings.
+
 ### Environment Setup
 
 ```bash

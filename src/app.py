@@ -72,6 +72,7 @@ async def ensure_mcp_servers():
     if mcp_servers is None:
         mcp_servers = await setup_mcp_servers()
 
+
 @function_tool
 async def get_local_info(query: str) -> str:
     """get more context based on the subject of the question.
@@ -79,20 +80,19 @@ async def get_local_info(query: str) -> str:
     in all things technology."""
     print("QUERY:", query)
     docs_content = ""
-    retrieved_docs = vectorstore.similarity_search_with_score(query)
+    retrieved_docs = vectorstore.similarity_search_with_score(query, k=3)
     print(f"Retrieved {len(retrieved_docs)} documents from vector store.")
     for doc, score in retrieved_docs:
         source_link = f"https://github.com/{doc.metadata['github_repo']}/tree/main/{doc.metadata['file_path']}\n"
 
-        print(f" ------------ {source_link} -------------------- ")
-        print(f" ------------ {score}       -------------------- ")
-        print(f" {doc.page_content[:2000]}...")
-        print( " ----------------------------------------------- ")
-    
-        if(score < 1.6):
+        print(f" --------------- {doc.metadata['file_path']} ({score}) ---------------")
+        print(f"{doc.page_content[:2000]}")
+
+        if(score < 1.5):
             docs_content += f"Source: {source_link}" + doc.page_content + "\n\n"
 
     return docs_content
+
 
 ##############
 # Agent Setup
