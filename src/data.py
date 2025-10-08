@@ -203,7 +203,7 @@ class DataManager:
         print(f"Chunking {len(documents)} documents...")
         
         # Define headers to split on (h1, h2, h3)
-        headers_to_split_on = [("#", "Header 1"), ("##", "Header 2"), ("###", "Header 3")]
+        headers_to_split_on = [("#", "H1"), ("##", "H2"), ("###", "H3")]
         header_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on, 
             strip_headers=False)
         
@@ -228,26 +228,27 @@ class DataManager:
         print(f"Created {len(final_chunks)} chunks")
         return final_chunks
     
-    def load_and_process_all(self, include_local: bool = True, include_github: bool = True,
-        github_repos: List[str] = None) -> List[Document]:
+    def load_and_process_all(self, github_repos: List[str] = None) -> List[Document]:
         """
-        Load, process, and chunk all documents.
+        Load, process, and chunk all documents. Automatically loads local documents if 
+        doc_load_local is set, and GitHub documents if github_repos (or self.github_repos) is set.
         
         Args:
-            include_local: Whether to load local documents.
-            include_github: Whether to load GitHub documents.
-            github_repos: Optional list of specific repos to load.
+            github_repos: Optional list of specific repos to load. Uses self.github_repos if None.
         
         Returns:
             List of processed and chunked documents.
         """
         all_docs = []
         
-        if include_local:
+        # Load local documents if patterns are configured
+        if self.doc_load_local:
             all_docs.extend(self.load_local_documents())
         
-        if include_github:
-            all_docs.extend(self.load_github_documents(repos=github_repos))
+        # Load GitHub documents if repos are configured
+        repos_to_load = github_repos if github_repos is not None else self.github_repos
+        if repos_to_load:
+            all_docs.extend(self.load_github_documents(repos=repos_to_load))
         
         processed_docs = self.process_documents(all_docs)
         chunks = self.chunk_documents(processed_docs)
@@ -304,23 +305,20 @@ class DataManager:
         self._vectorstore = vectorstore
         return vectorstore
     
-    def setup_vectorstore(self, include_local: bool = True, include_github: bool = True,
-        github_repos: List[str] = None, reset: bool = True) -> Chroma:
+    def setup_vectorstore(self, github_repos: List[str] = None, reset: bool = True) -> Chroma:
         """
-        Complete pipeline: load, process, chunk, and create vectorstore.
+        Complete pipeline: load, process, chunk, and create vectorstore. Automatically loads local
+        documents if doc_load_local is set, and GitHub documents if github_repos is specified.
         
         Args:
-            include_local: Whether to load local documents.
-            include_github: Whether to load GitHub documents.
-            github_repos: Optional list of specific repos to load.
+            github_repos: Optional list of specific repos to load. Uses self.github_repos if None.
             reset: If True, drop existing collection before creating.
         
         Returns:
             Chroma vectorstore instance ready for queries.
         """
         print("Setting up vectorstore...")
-        chunks = self.load_and_process_all(include_local=include_local,
-            include_github=include_github, github_repos=github_repos)
+        chunks = self.load_and_process_all(github_repos=github_repos)
         return self.create_vectorstore(chunks, reset=reset)
     
     def show_docs_for_file(self, filename: str):

@@ -26,8 +26,6 @@ This is a personal AI agent application that creates an agentic version of real 
 3. **MCP Server Integration** (Model Context Protocol)
    - GitHub MCP server runs in Docker (`ghcr.io/github/github-mcp-server`)
    - Time MCP server via `uvx mcp-server-time`
-   - MCP servers currently disabled in production (loop issues with current prompts) but fully implemented in notebooks for testing
-   - Access via `agents.mcp.MCPServerStdio` wrapper
 
 4. **UI Layer**
    - Gradio `ChatInterface` for conversational UI
@@ -86,10 +84,16 @@ Automatic CI/CD via `.github/workflows/update_space.yml`:
 - Automatically loads `.env` file via `SettingsConfigDict(env_file=".env")`
 - Import pattern: `from config import config` (singleton instance created by `_load_config()`)
 - All API keys are required fields - validation fails fast if missing from .env
-- Key typed properties: `config.model: str`, `config.doc_load_local: List[str]`, `config.github_repos: List[str]`, `config.agent_prompt: str`
-- **Focused on app/agent config and data sources** - data pipeline implementation details in `DataManager`
-- Properties (not computed fields): `mcp_github_params`, `mcp_time_params`, `mcp_params_list`, `agent_prompt`
+- Key typed properties: `config.model: str`, `config.doc_load_local: List[str]`, `config.github_repos: List[str]`, `config.bot_full_name: str`, `config.app_name: str`
+- **Focused on app/agent config and data sources** - data pipeline implementation details in `DataManager`, agent-specific config in `AgentConfig`
+
+### Agent Configuration (`src/agent.py`)
+- **AgentConfig class** handles agent-specific configuration including MCP servers and prompts
+- Import pattern: `from agent import AgentConfig` then `agent_config = AgentConfig(bot_full_name=config.bot_full_name, github_token=config.github_token.get_secret_value())`
+- Properties: `mcp_github_params`, `mcp_time_params`, `mcp_params_list`, `agent_prompt`
 - Uses `MCPServerParams` Pydantic model for type-safe MCP server configuration
+- Separates agent concerns from core app configuration
+- **Note**: Secret fields must use `.get_secret_value()` when passed to other classes
 
 ### Data Management Pattern (`src/data.py`)
 - **Centralized `DataManager` class** handles complete data pipeline
@@ -107,12 +111,14 @@ Automatic CI/CD via `.github/workflows/update_space.yml`:
   `DEFAULT_CHUNK_SIZE=1200`, `DEFAULT_CHUNK_OVERLAP=200`, 
   `DEFAULT_EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2"`, `DEFAULT_DB_NAME="ai_me"`
 - `DEFAULT_DOC_ROOT` uses `__file__` to compute path relative to module, ensuring correct path regardless of cwd
-- Main method: `data_manager.setup_vectorstore(include_local, include_github, github_repos, reset)`
+- Main method: `data_manager.setup_vectorstore(github_repos, reset)` - automatically loads based on list presence
 - Granular methods available:
   - Loading: `load_local_documents()`, `load_github_documents(repos)`
   - Processing: `process_documents(docs)`, `chunk_documents(docs)`
   - Vectorstore: `get_embeddings()`, `create_vectorstore(chunks, reset)`
-  - Complete: `setup_vectorstore()` (does everything)
+  - Pipeline: `load_and_process_all(github_repos)` - loads and processes based on configuration presence
+  - Complete: `setup_vectorstore(github_repos, reset)` - full pipeline (uses load_and_process_all internally)
+- Behavior is implicit: if `doc_load_local` list is non-empty, local docs are loaded; if `github_repos` is non-empty, GitHub docs are loaded
 - Automatically adds metadata, fixes GitHub links, and creates queryable vectorstore
 - Used by both `app.py` and notebooks for consistency
 
