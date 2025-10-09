@@ -17,9 +17,10 @@ class Config(BaseSettings):
         description="OpenAI API key for tracing")
     groq_api_key: SecretStr = Field(..., 
         description="Groq API key for inference")
-    github_token: SecretStr = Field(...,
+    github_token: Optional[SecretStr] = Field(
+        default=None,
         alias="github_personal_access_token",
-        description="GitHub PAT")
+        description="GitHub PAT for MCP servers (optional, not needed for testing)")
 
     bot_full_name: str = Field(
         default="AI ME -- set BOT_FULL_NAME in .env file", 
@@ -64,6 +65,9 @@ class Config(BaseSettings):
         case_sensitive=False,
         populate_by_name=True,  # Allow alias population
         extra="ignore",  # Ignore extra fields in .env
+        env_ignore_empty=True,  # Ignore empty env vars
+        # Explicitly read from environment variables first, then .env file
+        # This ensures GitHub Actions and other CI environments work
     )
     
     def model_post_init(self, __context) -> None:
