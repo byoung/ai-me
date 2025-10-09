@@ -38,6 +38,7 @@ class Config(BaseSettings):
         default=["**/*.md"],
         description="Glob patterns for local docs")
     github_repos: Union[str, List[str]] = Field(
+        default="",
         description="GitHub repos to load (format: owner/repo), comma-separated in .env")
     
     @field_validator("github_repos", mode="after")
