@@ -14,8 +14,7 @@ retriever = vectorstore.as_retriever()
 
 # Initialize agent config with vectorstore
 agent_config = AgentConfig(
-    bot_full_name=config.bot_full_name, 
-    github_token=config.github_token.get_secret_value(),
+    bot_full_name=config.bot_full_name,
     model=config.model,
     vectorstore=vectorstore
 )
