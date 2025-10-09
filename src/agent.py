@@ -18,9 +18,8 @@ class MCPServerParams(BaseModel):
 class AgentConfig:
     """Agent configuration including MCP servers and prompts."""
     
-    def __init__(self, bot_full_name: str, github_token: str, model: str = None, vectorstore=None):
+    def __init__(self, bot_full_name: str, model: str = None, vectorstore=None):
         self.bot_full_name = bot_full_name
-        self.github_token = github_token
         self.model = model
         self.vectorstore = vectorstore
     
@@ -33,8 +32,7 @@ class AgentConfig:
                 "run", "-i", "--rm",
                 "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
                 "ghcr.io/github/github-mcp-server"
-            ],
-            env={"GITHUB_PERSONAL_ACCESS_TOKEN": self.github_token}
+            ]
         )
     
     @property
