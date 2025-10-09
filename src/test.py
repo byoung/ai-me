@@ -44,10 +44,10 @@ async def ai_me_agent():
     Setup fixture for ai-me agent with vectorstore.
     This fixture is module-scoped to avoid reinitializing the agent for each test.
     """
-    # Initialize configuration with proper .env path (project root)
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    env_file = os.path.join(project_root, ".env")
-    config = Config(_env_file=env_file)
+    # Initialize configuration
+    # In GitHub Actions, env vars are set directly (no .env file)
+    # Locally, Config will read from .env file automatically
+    config = Config()
     
     # Get test_data directory path
     test_data_dir = os.path.join(project_root, "test_data")
