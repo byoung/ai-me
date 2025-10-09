@@ -65,7 +65,6 @@ async def ai_me_agent():
     # Initialize agent config with vectorstore
     agent_config = AgentConfig(
         bot_full_name=config.bot_full_name,
-        github_token=config.github_token.get_secret_value(),
         model=config.model,
         vectorstore=vectorstore
     )
