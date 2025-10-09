@@ -29,7 +29,10 @@ class Config(BaseSettings):
         description="Name of the primary agent")
     model: str = Field(
         default="openai/openai/gpt-oss-120b",
-        description="LLM model identifier")    
+        description="LLM model identifier")
+    temperature: float = Field(
+        default=1.0,
+        description="LLM temperature for sampling (0.0-2.0, default 1.0)")
     doc_load_local: List[str] = Field(
         default=["**/*.md"],
         description="Glob patterns for local docs")
@@ -71,7 +74,8 @@ class Config(BaseSettings):
         # Initialize Groq client for LLM operations
         self.openai_client = AsyncOpenAI(
             base_url="https://api.groq.com/openai/v1",
-            api_key=self.groq_api_key.get_secret_value()
+            api_key=self.groq_api_key.get_secret_value(),
+            default_query={"temperature": self.temperature}
         )
         set_default_openai_client(self.openai_client)
         

@@ -48,7 +48,7 @@ class AgentConfig:
     
     @property
     def mcp_params_list(self) -> List[Dict[str, Any]]:
-        """MCP servers disabled by default (infinite loop issues)."""
+        """Returns all of the MCP server parameters as a list of dicts."""
         return [self.mcp_github_params.model_dump(), self.mcp_time_params.model_dump()]
     
     @property
@@ -59,7 +59,8 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
  * If the user asks a question, use the get_local_info tool to gather more info
  * Answer based on the information given to you by the tool calls
  * do not offer follow up questions, just answer the question
- * Add Reference-style links if they contain https://github.com
+ * Add reference links at the end of the output if they contain https://github.com
+
 """
     
     async def setup_mcp_servers(self, params_list: List[Dict[str, Any]] = None):
@@ -83,7 +84,6 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
     
     def get_local_info_tool(self):
         """Create the get_local_info function tool."""
-        vectorstore = self.vectorstore
         
         @function_tool
         async def get_local_info(query: str) -> str:
@@ -92,16 +92,19 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
             experience in all things technology."""
             print("QUERY:", query)
             docs_content = ""
-            retrieved_docs = vectorstore.similarity_search_with_score(query, k=5)
+            retrieved_docs = self.vectorstore.similarity_search_with_score(query, k=5)
             print(f"Retrieved {len(retrieved_docs)} documents from vector store.")
             for doc, score in retrieved_docs:
-                github_repo = doc.metadata['github_repo']
-                file_path = doc.metadata['file_path']
-                source_link = f"https://github.com/{github_repo}/tree/main/{file_path}\n"
+                # Handle both GitHub and local documents
+                if 'github_repo' in doc.metadata:
+                    github_repo = doc.metadata['github_repo']
+                    file_path = doc.metadata.get('file_path', doc.metadata.get('source', 'unknown'))
+                    source_link = f"https://github.com/{github_repo}/tree/main/{file_path}\n"
+                else:
+                    # Local document - use source path
+                    source_link = f"Source: {doc.metadata.get('source', 'local document')}\n"
 
-                print(
-                    f" --------------- {doc.metadata['file_path']} ({score}) ---------------"
-                )
+                print(f" --------------- {doc.metadata.get('source', 'unknown')} ({score}) ---------------")
                 print(f"{doc.page_content[:100]}")
 
                 docs_content += f"Source: {source_link}" + doc.page_content + "\n\n"
@@ -110,54 +113,41 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         
         return get_local_info
     
-    async def get_researcher_agent(self, mcp_servers) -> Agent:
-        """Create the Source Code Researcher agent."""
-        researcher = Agent(
-            name="Source Code Researcher",
-            instructions=f"""
-                You'''re a source code researcher that uses your tools to gather information
-                from github. When searching source code, filter to only commits by the given
-                GitHub username.
-                """,
-            model=self.model,
-            mcp_servers=mcp_servers,
-        )
-        return researcher
-
-    async def get_researcher_tool(self, mcp_servers) -> Tool:
-        """Create the researcher tool from the researcher agent."""
-        researcher = await self.get_researcher_agent(mcp_servers)
-        return researcher.as_tool(
-            tool_name="SourceCodeResearcher",
-            tool_description=(
-                "This tool is for searching through source code repositories. "
-                "Use this tool if you have a github username and repo to filter on"
-            )
-        )
     
-    async def create_ai_me_agent(self, agent_prompt: str = None) -> Agent:
+    async def create_ai_me_agent(self, agent_prompt: str = None, 
+                                 use_mcp_servers: bool = False) -> Agent:
         """Create the main ai-me agent.
         
         Args:
             agent_prompt: Optional agent prompt to override default. If None, uses self.agent_prompt.
+            use_mcp_servers: Whether to initialize MCP servers. Default True.
+        
+        Note: Temperature is controlled at the model/provider level (e.g., via Groq API settings),
+              not through the Agent class directly.
         """
-        mcp_servers = await self.setup_mcp_servers()
+        mcp_servers = await self.setup_mcp_servers() if use_mcp_servers else None
 
         # Use provided prompt or fall back to default
         prompt = agent_prompt if agent_prompt is not None else self.agent_prompt
         print(prompt)
         
-        # Build tools list - always include local info, conditionally add researcher
+        # Build tools list - always include local info
         tools = [self.get_local_info_tool()]
-        if mcp_servers:
-            tools.append(await self.get_researcher_tool(mcp_servers))
         
         print("Creating ai-me agent with tools:", [tool.name for tool in tools])
 
-        ai_me = Agent(
-            model=self.model,
-            name="ai-me",
-            instructions=prompt,
-            tools=tools,
-        )
+        # Pass MCP servers directly to main agent instead of wrapping in sub-agent
+        agent_kwargs = {
+            "model": self.model,
+            "name": "ai-me",
+            "instructions": prompt,
+            "tools": tools,
+        }
+                
+        # Only add mcp_servers if we have them
+        if mcp_servers:
+            agent_kwargs["mcp_servers"] = mcp_servers
+            
+        ai_me = Agent(**agent_kwargs)
+
         return ai_me
