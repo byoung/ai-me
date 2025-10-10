@@ -4,6 +4,7 @@ from local directories and GitHub repositories, chunking, and creating ChromaDB 
 """
 import os
 from typing import List, Optional, Callable
+from pydantic import BaseModel, Field
 from langchain_community.document_loaders import (
     DirectoryLoader,
     TextLoader,
@@ -18,6 +19,26 @@ from chromadb.config import Settings
 import shutil
 import re
 
+class DataManagerConfig(BaseModel):
+    """Configuration for DataManager with Pydantic validation."""
+    
+    doc_load_local: List[str] = Field(
+        default=["**/*.md"], description="Glob patterns for local docs (e.g., ['*.md'])")
+    github_repos: List[str] = Field(
+        default=[], description="List of GitHub repos (format: owner/repo)")
+    doc_root: str = Field(
+        default=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docs")) + "/",
+        description="Root directory for local documents")
+    chunk_size: int = Field(
+        default=2500, description="Character chunk size for splitting")
+    chunk_overlap: int = Field(
+        default=0, description="Character overlap between chunks")
+    embedding_model: str = Field(
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        description="HuggingFace embedding model name")
+    db_name: str = Field(
+        default="ai_me", description="ChromaDB collection name")
+
 class DataManager:
     """
     Consolidated document loading, processing, and vectorstore management. Handles the complete
@@ -25,42 +46,28 @@ class DataManager:
     parameters have sensible defaults and can be overridden as needed.
     """
     
-    # Class-level configuration defaults. Compute doc_root relative to this file's parent dir.
-    DEFAULT_DOC_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docs")) + "/"
-    DEFAULT_CHUNK_SIZE = 2500
-    DEFAULT_CHUNK_OVERLAP = 0
-    DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-    DEFAULT_DB_NAME = "ai_me"
-    
-    def __init__(
-        self,
-        doc_load_local: List[str],
-        github_repos: List[str] = None,
-        doc_root: str = None,
-        chunk_size: int = None,
-        chunk_overlap: int = None,
-        embedding_model: str = None,
-        db_name: str = None,
-    ):
+    def __init__(self, config: Optional[DataManagerConfig] = None, **kwargs):
         """
         Initialize data manager with configuration.
         
         Args:
-            doc_load_local: Glob patterns for local docs (e.g., ["*.md"])
-            github_repos: List of GitHub repos (format: owner/repo) (default: [])
-            doc_root: Root directory for local documents (default: ./docs/)
-            chunk_size: Character chunk size for splitting (default: 1200)
-            chunk_overlap: Character overlap between chunks (default: 200)
-            embedding_model: HuggingFace model (default: sentence-transformers/all-MiniLM-L6-v2)
-            db_name: ChromaDB collection name (default: "ai_me")
+            config: Optional DataManagerConfig instance. If not provided, one will be created
+                from kwargs. For backward compatibility, can also pass individual parameters.
+            **kwargs: Individual config parameters (doc_load_local, github_repos, etc.)
+                Used when config is not provided or to override config values.
         """
-        self.doc_load_local = doc_load_local
-        self.github_repos = github_repos or []
-        self.doc_root = doc_root or self.DEFAULT_DOC_ROOT
-        self.chunk_size = chunk_size or self.DEFAULT_CHUNK_SIZE
-        self.chunk_overlap = chunk_overlap or self.DEFAULT_CHUNK_OVERLAP
-        self.embedding_model = embedding_model or self.DEFAULT_EMBEDDING_MODEL
-        self.db_name = db_name or self.DEFAULT_DB_NAME
+        if config is None:
+            # Create config from kwargs for backward compatibility
+            self.config = DataManagerConfig(**kwargs)
+        else:
+            # Use provided config, but allow kwargs to override
+            if kwargs:
+                # Merge provided config with overrides
+                config_dict = config.model_dump()
+                config_dict.update(kwargs)
+                self.config = DataManagerConfig(**config_dict)
+            else:
+                self.config = config
         
         # Internal state
         self._vectorstore: Optional[Chroma] = None
@@ -70,21 +77,21 @@ class DataManager:
         """
         Load documents from local directory. Returns empty list if directory not found.
         """
-        print(f"Loading local documents from: {self.doc_root}")
+        print(f"Loading local documents from: {self.config.doc_root}")
         
         # Check if directory exists first
-        if not os.path.exists(self.doc_root):
-            print(f"Warning: Directory not found: {self.doc_root} - skipping local documents")
+        if not os.path.exists(self.config.doc_root):
+            print(f"Warning: Directory not found: {self.config.doc_root} - skipping local documents")
             return []
         
         all_documents = []
         
         # Iterate over all glob patterns
-        for pattern in self.doc_load_local:
+        for pattern in self.config.doc_load_local:
             try:
                 print(f"  Loading pattern: {pattern}")
                 loader = DirectoryLoader(
-                    self.doc_root,
+                    self.config.doc_root,
                     glob=pattern,
                     loader_cls=TextLoader,
                     loader_kwargs={'encoding': 'utf-8'}
@@ -117,7 +124,7 @@ class DataManager:
             List of loaded documents from all repos.
         """
         if repos is None:
-            repos = self.github_repos
+            repos = self.config.github_repos
         
         if file_filter is None:
             def file_filter(fp: str) -> bool:
@@ -222,7 +229,7 @@ class DataManager:
                 all_chunks.append(new_doc)
         
         # Optional: Further split large chunks if they exceed size limit
-        size_splitter = MarkdownTextSplitter(chunk_size=DataManager.DEFAULT_CHUNK_SIZE)
+        size_splitter = MarkdownTextSplitter(chunk_size=self.config.chunk_size)
         final_chunks = size_splitter.split_documents(all_chunks)
         
         print(f"Created {len(final_chunks)} chunks")
@@ -231,10 +238,10 @@ class DataManager:
     def load_and_process_all(self, github_repos: List[str] = None) -> List[Document]:
         """
         Load, process, and chunk all documents. Automatically loads local documents if 
-        doc_load_local is set, and GitHub documents if github_repos (or self.github_repos) is set.
+        doc_load_local is set, and GitHub documents if github_repos (or self.config.github_repos) is set.
         
         Args:
-            github_repos: Optional list of specific repos to load. Uses self.github_repos if None.
+            github_repos: Optional list of specific repos to load. Uses self.config.github_repos if None.
         
         Returns:
             List of processed and chunked documents.
@@ -242,11 +249,11 @@ class DataManager:
         all_docs = []
         
         # Load local documents if patterns are configured
-        if self.doc_load_local:
+        if self.config.doc_load_local:
             all_docs.extend(self.load_local_documents())
         
         # Load GitHub documents if repos are configured
-        repos_to_load = github_repos if github_repos is not None else self.github_repos
+        repos_to_load = github_repos if github_repos is not None else self.config.github_repos
         if repos_to_load:
             all_docs.extend(self.load_github_documents(repos=repos_to_load))
         
@@ -263,8 +270,8 @@ class DataManager:
             HuggingFace embeddings instance
         """
         if self._embeddings is None:
-            print(f"Loading embeddings model: {self.embedding_model}")
-            self._embeddings = HuggingFaceEmbeddings(model_name=self.embedding_model)
+            print(f"Loading embeddings model: {self.config.embedding_model}")
+            self._embeddings = HuggingFaceEmbeddings(model_name=self.config.embedding_model)
         return self._embeddings
     
     def create_vectorstore(self, chunks: List[Document], reset: bool = True) -> Chroma:
@@ -286,8 +293,8 @@ class DataManager:
         # Drop existing collection if requested
         if reset:
             try:
-                chroma_client.delete_collection(self.db_name)
-                print(f"Dropped existing collection: {self.db_name}")
+                chroma_client.delete_collection(self.config.db_name)
+                print(f"Dropped existing collection: {self.config.db_name}")
             except Exception:
                 pass  # Collection doesn't exist yet
         
@@ -296,7 +303,7 @@ class DataManager:
             documents=chunks,
             embedding=embeddings,
             client=chroma_client,
-            collection_name=self.db_name,
+            collection_name=self.config.db_name,
         )
         
         count = vectorstore._collection.count()
@@ -311,7 +318,7 @@ class DataManager:
         documents if doc_load_local is set, and GitHub documents if github_repos is specified.
         
         Args:
-            github_repos: Optional list of specific repos to load. Uses self.github_repos if None.
+            github_repos: Optional list of specific repos to load. Uses self.config.github_repos if None.
             reset: If True, drop existing collection before creating.
         
         Returns:

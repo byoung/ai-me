@@ -1,6 +1,6 @@
 from config import Config
-from agent import AgentConfig
-from data import DataManager
+from agent import AIMeAgent
+from data import DataManager, DataManagerConfig
 from agents import Runner
 import gradio
 import asyncio
@@ -8,12 +8,14 @@ import asyncio
 config = Config()
 
 # Initialize data manager and vectorstore
-data_manager = DataManager(doc_load_local=config.doc_load_local, github_repos=config.github_repos)
+data_config = DataManagerConfig(
+    github_repos=config.github_repos
+)
+data_manager = DataManager(config=data_config)
 vectorstore = data_manager.setup_vectorstore()
-retriever = vectorstore.as_retriever()
 
 # Initialize agent config with vectorstore
-agent_config = AgentConfig(
+agent_config = AIMeAgent(
     bot_full_name=config.bot_full_name,
     model=config.model,
     vectorstore=vectorstore
@@ -23,6 +25,7 @@ agent_config = AgentConfig(
 ai_me = None
 
 async def chat(user_input: str, history):
+    # TBD: Consider using a mutable structure to avoid 'global' keyword 
     global ai_me
     if ai_me is None:
         ai_me = await agent_config.create_ai_me_agent(agent_config.agent_prompt)

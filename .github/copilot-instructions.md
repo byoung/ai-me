@@ -12,6 +12,10 @@ This is a personal AI agent application that creates an agentic version of real 
 - try to keep function calls on a single line if possible.
 - use the full 100 characters for comments and docstrings.
 
+### Testing
+
+- Always run tests after refactoring or adding features.
+
 ### Environment Setup
 
 ```bash
@@ -53,7 +57,11 @@ Automatic CI/CD via `.github/workflows/update_space.yml`:
 ### Configuration Management
 - **Pydantic BaseSettings** with strict type safety and validation
 - Automatically loads `.env` file via `SettingsConfigDict(env_file=".env")`
-- All API keys are required fields - validation fails fast if missing from .env
+- All API keys are required fields - validation fails fast if missing from .env or environment
+- **Immutable configuration pattern**: Prefer creating multiple config instances over mutating shared configs
+  - Use smart `default` values in Pydantic Fields that get replaced at instantiation
+  - Avoid `default_factory` unless values will be mutated after creation
+  - Example: `DataManagerConfig(github_repos=["repo1"])` vs mutating a shared instance
 
 **Note**: Pydantic secret fields must use `.get_secret_value()` when passed to other classes
 

@@ -33,8 +33,8 @@ os.environ["LOCAL_DOCS"] = "**/*.md"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import Config
-from agent import AgentConfig
-from data import DataManager
+from agent import AIMeAgent
+from data import DataManager, DataManagerConfig
 from agents import Runner
 
 
@@ -54,16 +54,16 @@ async def ai_me_agent():
     
     # Initialize data manager and vectorstore with test data
     print(f"Setting up vectorstore with test data from {test_data_dir}...", flush=True)
-    data_manager = DataManager(
-        doc_load_local=config.doc_load_local,
+    data_config = DataManagerConfig(
         github_repos=config.github_repos,
         doc_root=test_data_dir  # Use test_data directory instead of default docs/
     )
+    data_manager = DataManager(config=data_config)
     vectorstore = data_manager.setup_vectorstore()
     print(f"Vectorstore setup complete with {vectorstore._collection.count()} documents", flush=True)
     
     # Initialize agent config with vectorstore
-    agent_config = AgentConfig(
+    agent_config = AIMeAgent(
         bot_full_name=config.bot_full_name,
         model=config.model,
         vectorstore=vectorstore

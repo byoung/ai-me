@@ -34,9 +34,6 @@ class Config(BaseSettings):
     temperature: float = Field(
         default=1.0,
         description="LLM temperature for sampling (0.0-2.0, default 1.0)")
-    doc_load_local: List[str] = Field(
-        default=["**/*.md"],
-        description="Glob patterns for local docs")
     github_repos: Union[str, List[str]] = Field(
         default="",
         description="GitHub repos to load (format: owner/repo), comma-separated in .env")

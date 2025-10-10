@@ -3,7 +3,7 @@ Agent configuration and MCP server setup.
 Handles agent-specific configuration like MCP servers and prompts.
 """
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, computed_field
 from agents import Agent, Tool, function_tool
 from agents.mcp import MCPServerStdio
 
@@ -15,13 +15,15 @@ class MCPServerParams(BaseModel):
     env: Optional[Dict[str, str]] = None
 
 
-class AgentConfig:
+class AIMeAgent(BaseModel):
     """Agent configuration including MCP servers and prompts."""
     
-    def __init__(self, bot_full_name: str, model: str = None, vectorstore=None):
-        self.bot_full_name = bot_full_name
-        self.model = model
-        self.vectorstore = vectorstore
+    bot_full_name: str
+    model: str
+    vectorstore: Any = Field(default=None, exclude=True)
+    
+    class Config:
+        arbitrary_types_allowed = True
     
     @property
     def mcp_github_params(self) -> MCPServerParams:
@@ -49,6 +51,7 @@ class AgentConfig:
         """Returns all of the MCP server parameters as a list of dicts."""
         return [self.mcp_github_params.model_dump(), self.mcp_time_params.model_dump()]
     
+    @computed_field
     @property
     def agent_prompt(self) -> str:
         """Generate agent prompt template."""
@@ -61,16 +64,14 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
 
 """
     
-    async def setup_mcp_servers(self, params_list: List[Dict[str, Any]] = None):
+    async def setup_mcp_servers(self):
         """Initialize and connect all MCP servers."""
-        if params_list is None:
-            params_list = self.mcp_params_list
         
         mcp_servers_local = []
-        for i, params in enumerate(params_list):
+        for i, params in enumerate(self.mcp_params_list):
             try:
                 print(f"Creating MCP server {i+1}...")
-                server = MCPServerStdio(params=params, client_session_timeout_seconds=30)
+                server = MCPServerStdio(params, client_session_timeout_seconds=30)
                 await server.connect()
                 print(f"Connected to MCP server {i+1}")
                 mcp_servers_local.append(server)
@@ -111,7 +112,7 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         
         return get_local_info
     
-    
+    # TBD: Make the tools and mcp_servers more extensible/configurable 
     async def create_ai_me_agent(self, agent_prompt: str = None, 
                                  use_mcp_servers: bool = False) -> Agent:
         """Create the main ai-me agent.
@@ -119,20 +120,19 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         Args:
             agent_prompt: Optional agent prompt to override default. If None, uses self.agent_prompt.
             use_mcp_servers: Whether to initialize MCP servers. Default True.
-        
-        Note: Temperature is controlled at the model/provider level (e.g., via Groq API settings),
-              not through the Agent class directly.
+        Returns:
+            An initialized Agent instance.
         """
         mcp_servers = await self.setup_mcp_servers() if use_mcp_servers else None
 
         # Use provided prompt or fall back to default
         prompt = agent_prompt if agent_prompt is not None else self.agent_prompt
-        print(prompt)
+        print(f"Creating ai-me agent with prompt: {prompt}")
         
         # Build tools list - always include local info
         tools = [self.get_local_info_tool()]
-        
-        print("Creating ai-me agent with tools:", [tool.name for tool in tools])
+
+        print(f"Creating ai-me agent with tools: {[tool.name for tool in tools]}")
 
         # Pass MCP servers directly to main agent instead of wrapping in sub-agent
         agent_kwargs = {
