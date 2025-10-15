@@ -66,7 +66,8 @@ async def ai_me_agent():
     agent_config = AIMeAgent(
         bot_full_name=config.bot_full_name,
         model=config.model,
-        vectorstore=vectorstore
+        vectorstore=vectorstore,
+        github_token=config.github_token
     )
     
     # Create the agent (without MCP servers for faster testing - tests 1 and 3 only need vectorstore)
@@ -74,7 +75,7 @@ async def ai_me_agent():
     print("Creating ai-me agent...", flush=True)
     agent = await agent_config.create_ai_me_agent(
         agent_config.agent_prompt, 
-        use_mcp_servers=False
+        mcp_params=[]  # Empty list disables MCP servers
     )
     print("Agent created successfully", flush=True)
     print("Note: MCP servers disabled for these tests (only vectorstore RAG is needed)", flush=True)

@@ -3,17 +3,17 @@ Agent configuration and MCP server setup.
 Handles agent-specific configuration like MCP servers and prompts.
 """
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, ConfigDict, SecretStr
 from agents import Agent, Tool, function_tool
 from agents.mcp import MCPServerStdio
-
+import os
 
 class MCPServerParams(BaseModel):
     """Type-safe MCP server parameters."""
     command: str
     args: List[str]
     env: Optional[Dict[str, str]] = None
-
+    description: Optional[str] = None  # Human-readable name for debugging
 
 class AIMeAgent(BaseModel):
     """Agent configuration including MCP servers and prompts."""
@@ -21,35 +21,37 @@ class AIMeAgent(BaseModel):
     bot_full_name: str
     model: str
     vectorstore: Any = Field(default=None, exclude=True)
+    github_token: Optional[SecretStr] = Field(default=None, exclude=True)
     
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
+    @computed_field
     @property
     def mcp_github_params(self) -> MCPServerParams:
-        """Generate MCP GitHub server parameters."""
+        """GitHub MCP server params with token injected from instance."""
         return MCPServerParams(
+            env={
+                "GITHUB_TOOLSETS": "repos",
+                "GITHUB_PERSONAL_ACCESS_TOKEN": self.github_token.get_secret_value() if self.github_token else "",
+            },
             command="docker",
-            args=[
-                "run", "-i", "--rm",
-                "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
-                "ghcr.io/github/github-mcp-server"
-            ]
+            args=["run", "-i", "--rm", 
+                  "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+                  "-e", "GITHUB_TOOLSETS",
+                  "ghcr.io/github/github-mcp-server"],
+            description="GitHub MCP Server"
         )
     
+    @computed_field
     @property
     def mcp_time_params(self) -> MCPServerParams:
-        """Generate MCP time server parameters."""
+        """Time MCP server params."""
         return MCPServerParams(
             command="uvx",
             args=["mcp-server-time", "--local-timezone=Etc/UTC"],
-            env=None
+            env=None,
+            description="Time MCP Server"
         )
-    
-    @property
-    def mcp_params_list(self) -> List[Dict[str, Any]]:
-        """Returns all of the MCP server parameters as a list of dicts."""
-        return [self.mcp_github_params.model_dump(), self.mcp_time_params.model_dump()]
     
     @computed_field
     @property
@@ -61,22 +63,23 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
  * Answer based on the information given to you by the tool calls
  * do not offer follow up questions, just answer the question
  * Add reference links at the end of the output if they contain https://github.com
-
 """
     
-    async def setup_mcp_servers(self):
-        """Initialize and connect all MCP servers."""
+    async def setup_mcp_servers(self, mcp_params_list: List[MCPServerParams]):
+        """Initialize and connect all MCP servers from provided parameters list."""
         
         mcp_servers_local = []
-        for i, params in enumerate(self.mcp_params_list):
+        for i, params in enumerate(mcp_params_list):
+            server_name = params.description or f"Server {i+1}"
             try:
-                print(f"Creating MCP server {i+1}...")
-                server = MCPServerStdio(params, client_session_timeout_seconds=30)
+                print(f"Connecting to {server_name}...", end=" ")
+                server = MCPServerStdio(params.model_dump(), client_session_timeout_seconds=30)
                 await server.connect()
-                print(f"Connected to MCP server {i+1}")
+                print("✓")
                 mcp_servers_local.append(server)
+                
             except Exception as e:
-                print(f"Error initializing MCP server {i+1}: {e}")
+                print(f"✗ {type(e).__name__}: {e}")
                 continue
 
         return mcp_servers_local
@@ -113,24 +116,37 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         return get_local_info
     
     # TBD: Make the tools and mcp_servers more extensible/configurable 
-    async def create_ai_me_agent(self, agent_prompt: str = None, 
-                                 use_mcp_servers: bool = False) -> Agent:
+    async def create_ai_me_agent(self, agent_prompt: str = None,
+        mcp_params: Optional[List[MCPServerParams]] = None,
+        additional_tools: Optional[List[Tool]] = None) -> Agent:
         """Create the main ai-me agent.
         
         Args:
             agent_prompt: Optional agent prompt to override default. If None, uses self.agent_prompt.
-            use_mcp_servers: Whether to initialize MCP servers. Default True.
+            mcp_params: Optional list of MCP server parameters to initialize. If None, defaults to
+                [mcp_time_params]. Pass an empty list to disable MCP servers.
+            additional_tools: Optional list of additional tools to append to the default get_local_info tool.
+                The get_local_info tool is always included as the first tool.
         Returns:
             An initialized Agent instance.
         """
-        mcp_servers = await self.setup_mcp_servers() if use_mcp_servers else None
+        # Default to just time server if not specified
+        if mcp_params is None:
+            mcp_params = [self.mcp_time_params]
+        
+        # Setup MCP servers if any params provided
+        mcp_servers = await self.setup_mcp_servers(mcp_params) if mcp_params else None
 
         # Use provided prompt or fall back to default
         prompt = agent_prompt if agent_prompt is not None else self.agent_prompt
         print(f"Creating ai-me agent with prompt: {prompt}")
         
-        # Build tools list - always include local info
+        # Build tools list - get_local_info is always the default first tool
         tools = [self.get_local_info_tool()]
+        
+        # Append any additional tools provided
+        if additional_tools:
+            tools.extend(additional_tools)
 
         print(f"Creating ai-me agent with tools: {[tool.name for tool in tools]}")
 
@@ -147,5 +163,9 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
             agent_kwargs["mcp_servers"] = mcp_servers
             
         ai_me = Agent(**agent_kwargs)
+
+        # Print all available tools after agent initialization
+        tool_names = [tool.name if hasattr(tool, 'name') else str(tool) for tool in (ai_me.tools or [])]
+        print(f"Available tools: {', '.join(tool_names) if tool_names else 'none'}")
 
         return ai_me

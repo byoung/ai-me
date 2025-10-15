@@ -15,6 +15,8 @@ This is a personal AI agent application that creates an agentic version of real 
 ### Testing
 
 - Always run tests after refactoring or adding features.
+- **Always check and update notebooks** (`src/notebooks/experiments.ipynb`) when refactoring APIs or changing function signatures. Notebooks are just as important as test files and application code.
+- **Use `uv` for all code execution** (tests, scripts, etc.). See `TESTING.md` for test commands: `uv run pytest src/test.py -v`
 
 ### Environment Setup
 

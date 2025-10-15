@@ -18,7 +18,8 @@ vectorstore = data_manager.setup_vectorstore()
 agent_config = AIMeAgent(
     bot_full_name=config.bot_full_name,
     model=config.model,
-    vectorstore=vectorstore
+    vectorstore=vectorstore,
+    github_token=config.github_token
 )
 
 # Lazy agent initialization

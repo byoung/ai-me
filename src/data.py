@@ -130,6 +130,7 @@ class DataManager:
             def file_filter(fp: str) -> bool:
                 fp_lower = fp.lower()
                 basename = os.path.basename(fp).lower()
+                # TBD: Make this configurable once chunking logic is enhanced
                 keep = (fp_lower.endswith(".md") and 
                     basename not in ["contributing.md", "code_of_conduct.md", "security.md", 
                                      "readme.md"])
