@@ -4,7 +4,6 @@ Tests the complete setup including vectorstore, agent configuration, and agent r
 """
 import pytest
 import pytest_asyncio
-import asyncio
 import re
 import sys
 import os
@@ -35,7 +34,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import Config
 from agent import AIMeAgent
 from data import DataManager, DataManagerConfig
-from agents import Runner
 
 
 @pytest_asyncio.fixture(scope="module")
@@ -43,6 +41,7 @@ async def ai_me_agent():
     """
     Setup fixture for ai-me agent with vectorstore.
     This fixture is module-scoped to avoid reinitializing the agent for each test.
+    Returns the AIMeAgent instance (not the Agent) so tests can use the run() method.
     """
     # Initialize configuration
     # In GitHub Actions, env vars are set directly (no .env file)
@@ -73,7 +72,7 @@ async def ai_me_agent():
     # Create the agent (without MCP servers for faster testing - tests 1 and 3 only need vectorstore)
     # Temperature is controlled via config.temperature (default 1.0, or set TEMPERATURE in .env)
     print("Creating ai-me agent...", flush=True)
-    agent = await agent_config.create_ai_me_agent(
+    await agent_config.create_ai_me_agent(
         agent_config.agent_prompt, 
         mcp_params=[]  # Empty list disables MCP servers
     )
@@ -81,7 +80,8 @@ async def ai_me_agent():
     print("Note: MCP servers disabled for these tests (only vectorstore RAG is needed)", flush=True)
     print(f"Note: Temperature set to {config.temperature} (from config)", flush=True)
     
-    return agent
+    # Return the agent_config instance so tests can use agent_config.run()
+    return agent_config
 
 
 @pytest.mark.asyncio
@@ -94,8 +94,7 @@ async def test_rear_knowledge_contains_it245(ai_me_agent):
     print(f"\n{'='*60}\nTest 1: {query}\n{'='*60}", flush=True)
     
     print("Running agent query...", flush=True)
-    result = await Runner.run(ai_me_agent, query, max_turns=30)
-    response = result.final_output
+    response = await ai_me_agent.run(query, max_turns=30)
     
     print(f"Response:\n{response}\n{'='*60}", flush=True)
     
@@ -118,8 +117,7 @@ async def test_github_commits_contains_shas(ai_me_agent):
     query = "Give me a summary of all the commits you've made in the last week"
     print(f"\n{'='*60}\nTest 2: {query}\n{'='*60}", flush=True)
     
-    result = await Runner.run(ai_me_agent, query, max_turns=30)
-    response = result.final_output
+    response = await ai_me_agent.run(query, max_turns=30)
     
     print(f"Response:\n{response}\n{'='*60}")
     
@@ -143,8 +141,8 @@ async def test_unknown_person_contains_negative_response(ai_me_agent):
     query = "who is slartibartfast?"
     print(f"\n{'='*60}\nTest 3: {query}\n{'='*60}")
     
-    result = await Runner.run(ai_me_agent, query, max_turns=30)
-    response = result.final_output.lower()  # Convert to lowercase for matching
+    response_raw = await ai_me_agent.run(query, max_turns=30)
+    response = response_raw.lower()  # Convert to lowercase for matching
     
     print(f"Response:\n{response}\n{'='*60}")
     
@@ -179,8 +177,8 @@ async def test_carol_knowledge_contains_product(ai_me_agent):
     This tests that the agent can retrieve team member information and their roles.
     """
     query = "Do you know Carol?"
-    result = await Runner.run(ai_me_agent, query, max_turns=30)
-    response = result.final_output.lower()  # Convert to lowercase for matching
+    response_raw = await ai_me_agent.run(query, max_turns=30)
+    response = response_raw.lower()  # Convert to lowercase for matching
     
     print(f"Response:\n{response}\n{'='*60}")
     

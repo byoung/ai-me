@@ -34,8 +34,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN=<for MCP servers and GitLoader>
 
 ```bash
 # Production app
-cd src
-python app.py  # Launches Gradio on default port
+un run src/app.py  # Launches Gradio on default port
 
 # Experiments (notebooks)
 # Notebook can be run locally after a uv sync or in via docker-compose
@@ -46,13 +45,12 @@ docker-compose up notebooks
 ### Deployment
 
 ```bash
-# Production app
-cd src
+# Production app (deploy from root)
 gradio deploy
 
 Automatic CI/CD via `.github/workflows/update_space.yml`:
 - Push to `main` triggers Gradio CLI deployment to Hugging Face Spaces
-- App metadata in `src/README.md` (Gradio Space config)
+- App metadata in root `README.md` (Gradio Space config)
 
 ## Key Patterns & Conventions
 
@@ -88,9 +86,9 @@ Automatic CI/CD via `.github/workflows/update_space.yml`:
 ## Common Gotchas
 
 1. **Model naming**: For some reason OpenAI and Groq can't agree to be concise so the default model name is `"openai/openai/gpt-oss-120b"` 
-1. **uv vs pip**: Project uses `uv` for lock files; `requirements.txt` generated for Gradio deploy only. Would love to move fully to `uv` but Gradio deploy requires `requirements.txt`
+1. **uv vs pip**: Project uses `uv` for lock files; don't use `pip` directly
 1. **ChromaDB persistence**: EphemeralClient means vectorstore rebuilt on restart
-1. **Hugging Face Spaces**: For some reason the python packages on huggingface spaces are slightly out of date (e.g. `networkx` 3.4.2 vs 3.5). If you hit weird dependency issues during `gradio deploy`, pin the versions in `src/requirements.txt` accordingly.
+
 
 ## File Organization
 

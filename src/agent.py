@@ -4,7 +4,8 @@ Handles agent-specific configuration like MCP servers and prompts.
 """
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field, computed_field, ConfigDict, SecretStr
-from agents import Agent, Tool, function_tool
+from agents import Agent, Tool, function_tool, Runner
+from agents.result import RunResult
 from agents.mcp import MCPServerStdio
 import os
 
@@ -14,6 +15,7 @@ class MCPServerParams(BaseModel):
     args: List[str]
     env: Optional[Dict[str, str]] = None
     description: Optional[str] = None  # Human-readable name for debugging
+
 
 class AIMeAgent(BaseModel):
     """Agent configuration including MCP servers and prompts."""
@@ -28,17 +30,18 @@ class AIMeAgent(BaseModel):
     @computed_field
     @property
     def mcp_github_params(self) -> MCPServerParams:
-        """GitHub MCP server params with token injected from instance."""
+        """GitHub MCP server params with token injected from instance.
+        
+        Uses npx to run the GitHub MCP server directly without Docker.
+        This works in environments without Docker daemon access (like HF Spaces).
+        """
         return MCPServerParams(
             env={
                 "GITHUB_TOOLSETS": "repos",
                 "GITHUB_PERSONAL_ACCESS_TOKEN": self.github_token.get_secret_value() if self.github_token else "",
             },
-            command="docker",
-            args=["run", "-i", "--rm", 
-                  "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
-                  "-e", "GITHUB_TOOLSETS",
-                  "ghcr.io/github/github-mcp-server"],
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-github"],
             description="GitHub MCP Server"
         )
     
@@ -72,16 +75,27 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         for i, params in enumerate(mcp_params_list):
             server_name = params.description or f"Server {i+1}"
             try:
-                print(f"Connecting to {server_name}...", end=" ")
+                print(f"\n=== Attempting to connect to {server_name} ===")
+                print(f"Command: {params.command}")
+                print(f"Args: {params.args}")
+                print(f"Env vars: {list(params.env.keys()) if params.env else 'None'}")
+                
                 server = MCPServerStdio(params.model_dump(), client_session_timeout_seconds=30)
+                print(f"MCPServerStdio instance created, calling connect()...")
                 await server.connect()
-                print("✓")
+                print(f"✓ {server_name} connected successfully")
                 mcp_servers_local.append(server)
                 
             except Exception as e:
-                print(f"✗ {type(e).__name__}: {e}")
+                print(f"✗ {server_name} failed to connect")
+                print(f"  Error type: {type(e).__name__}")
+                print(f"  Error message: {e}")
+                # Print full traceback for debugging
+                import traceback
+                print(f"  Traceback:\n{traceback.format_exc()}")
                 continue
 
+        print(f"\n=== MCP Server Summary: {len(mcp_servers_local)}/{len(mcp_params_list)} connected ===\n")
         return mcp_servers_local
     
     def get_local_info_tool(self):
@@ -168,4 +182,33 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         tool_names = [tool.name if hasattr(tool, 'name') else str(tool) for tool in (ai_me.tools or [])]
         print(f"Available tools: {', '.join(tool_names) if tool_names else 'none'}")
 
+        # Store agent internally for use with run() method
+        self._agent = ai_me
+
         return ai_me
+
+    async def run(self, user_input: str, **runner_kwargs) -> str:
+        """Run the agent and post-process output to remove Unicode brackets.
+        
+        This is the standard way to run ai-me agents. It wraps Runner.run and ensures
+        that problematic Unicode characters (like 【 and 】) are replaced with ASCII
+        equivalents in the final output.
+        
+        Args:
+            user_input: The user's input/query
+            **runner_kwargs: Additional keyword arguments to pass to Runner.run
+                (e.g., max_turns, session, etc.)
+        
+        Returns:
+            The cleaned final output string with Unicode brackets replaced
+        
+        Raises:
+            ValueError: If no agent has been created yet
+        """
+        result: RunResult = await Runner.run(self._agent, user_input, **runner_kwargs)
+        
+        # Post-process: replace Unicode brackets with spaces (they corrupt URLs)
+        cleaned_output = result.final_output.replace("】", " ").replace("【", " ")
+        
+        return cleaned_output
+

@@ -1,3 +1,8 @@
+---
+title: ben-bot
+app_file: src/app.py
+sdk: docker
+---
 # ai-me
 
 An agentic version of real people using RAG (Retrieval Augmented Generation) over markdown documentation. The agent learns from personal docs and public GitHub repos to answer questions and maintain context about a person's work, writing, and expertise.
@@ -55,8 +60,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN=<for loading GitHub repos>
 
 ```bash
 # Production app
-cd src
-python app.py  # Launches Gradio on default port
+uv run src/app.py  # Launches Gradio on default port
 
 # Experiments (notebooks)
 docker-compose up notebooks
@@ -66,7 +70,7 @@ docker-compose up notebooks
 ## Deployment
 
 ```bash
-cd src
+# Deploy from root directory
 uv export --no-dev --no-hashes --format requirements-txt > requirements.txt
 gradio deploy
 ```

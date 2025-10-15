@@ -1,0 +1,29 @@
+# Environment and secrets
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.coverage
+htmlcov
+*.egg-info
+.ipynb_checkpoints
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+*.log
