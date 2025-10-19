@@ -2,12 +2,19 @@
 Agent configuration and MCP server setup.
 Handles agent-specific configuration like MCP servers and prompts.
 """
+import logging
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field, computed_field, ConfigDict, SecretStr
 from agents import Agent, Tool, function_tool, Runner
 from agents.result import RunResult
 from agents.mcp import MCPServerStdio
-import logger
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class MCPServerParams(BaseModel):
     """Type-safe MCP server parameters."""
@@ -34,14 +41,20 @@ class AIMeAgent(BaseModel):
         
         Uses npx to run the GitHub MCP server directly without Docker.
         This works in environments without Docker daemon access (like HF Spaces).
+        
+        Note: The GitHub MCP server CLI doesn't properly support --toolsets and --read-only
+        flags via npx, so we connect to all tools but filter at the agent level via the
+        tools passed to create_agent(). See the chat() method for how tools are filtered.
         """
         return MCPServerParams(
+            command="npx",
+            args=[
+                "-y",
+                "@modelcontextprotocol/server-github",
+            ],
             env={
-                "GITHUB_TOOLSETS": "repos",
                 "GITHUB_PERSONAL_ACCESS_TOKEN": self.github_token.get_secret_value() if self.github_token else "",
             },
-            command="npx",
-            args=["-y", "@modelcontextprotocol/server-github"],
             description="GitHub MCP Server"
         )
     
@@ -188,45 +201,24 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         return ai_me
 
     async def run(self, user_input: str, **runner_kwargs) -> str:
-        """Run the agent and post-process output to remove Unicode brackets.
-        
-        This is the standard way to run ai-me agents. It wraps Runner.run and ensures
-        that problematic Unicode characters (like 【 and 】) are replaced with ASCII
-        equivalents in the final output.
-        
-        Args:
-            user_input: The user's input/query
-            **runner_kwargs: Additional keyword arguments to pass to Runner.run
-                (e.g., max_turns, session, etc.)
-        
-        Returns:
-            The cleaned final output string with Unicode brackets replaced
-        
-        Raises:
-            ValueError: If no agent has been created yet
-        """
+        """Run the agent and post-process output to remove Unicode brackets."""
         try:
             result: RunResult = await Runner.run(self._agent, user_input, **runner_kwargs)
         except Exception as e:
-            # Check if this is a GitHub API rate limit error
-            error_str = str(e)
-            if "rate limit" in error_str.lower() or "api rate limit exceeded" in error_str.lower():
-                logger.error("⚠️  GITHUB API RATE LIMIT EXCEEDED: %s", error_str)
-                # Return a message informing user that GitHub tools are temporarily unavailable
-                # The agent should still have access to RAG (local info) tools
-                result_text = (
-                    "⚠️ GitHub API rate limit exceeded. I'm currently unable to access "
-                    "live GitHub data, but I can still answer questions based on my "
-                    "knowledge base. Please try again in a few minutes, or ask me something "
-                    "about my documented experience and projects."
-                )
-                return result_text
+            error_str = str(e).lower()
+            
+            if "rate limit" in error_str or "api rate limit exceeded" in error_str:
+                return "⚠️ GitHub rate limit exceeded. Try again in a few minutes or ask about my knowledge base."
+            elif "tool call validation failed" in error_str or "additionalproperties" in error_str or "parameters for tool" in error_str:
+                return "⚠️ GitHub tool error. Let me answer using my knowledge base instead."
+            elif "github" in error_str and ("error" in error_str or "exception" in error_str):
+                return "⚠️ GitHub API error. I'll use my knowledge base to help instead."
+            elif "400" in error_str or "badrequest" in error_str or "invalid_request" in error_str:
+                return "⚠️ Invalid GitHub request. Using knowledge base instead."
             else:
-                # Re-raise if it's not a rate limit error
-                raise
+                logger.error("Unexpected error: %s", error_str)
+                return "⚠️ Something went wrong. Please try again."
         
-        # Post-process: replace Unicode brackets with spaces (they corrupt URLs)
         cleaned_output = result.final_output.replace("】", " ").replace("【", " ")
-        
         return cleaned_output
 

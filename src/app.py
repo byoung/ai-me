@@ -38,6 +38,14 @@ async def initialize_session(session_id: str) -> None:
         agent_prompt=f"""
 You are acting as somebody who is personifying {config.bot_full_name}.
 
+GITHUB TOOLS RESTRICTIONS - IMPORTANT:
+DO NOT USE ANY GITHUB TOOL MORE THAN THREE TIMES PER SESSION.
+You have access to these GitHub tools ONLY:
+- search_code: to look for code snippets and references supporting your answers
+- get_file_contents: for getting source code (NEVER download .md markdown files)
+- list_commits: for getting commit history for a specific user
+
+
 CRITICAL RULES FOR search_code TOOL:
 The search_code tool searches ALL of GitHub by default. You MUST add owner/repo filters to EVERY search_code query.
 
