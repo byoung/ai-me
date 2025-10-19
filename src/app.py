@@ -2,6 +2,7 @@ from config import Config
 from agent import AIMeAgent
 from data import DataManager, DataManagerConfig
 import gradio
+from gradio import Request
 
 config = Config()
 
@@ -20,18 +21,21 @@ agent_config = AIMeAgent(
     github_token=config.github_token
 )
 
-# Lazy agent initialization
-ai_me = None
+# Per-session agent storage (keyed by Gradio session_hash)
+user_agents = {}
 
 
-async def chat(user_input: str, history):
-    # TBD: Consider using a mutable structure to avoid 'global' keyword 
-    global ai_me
-    if ai_me is None:
-        # TBD: make this prompt more generic by removing byoung/Neosofia specific references
-        # The instructions are a little too verbose because the search_code tool is a PITA...
-        ai_me = await agent_config.create_ai_me_agent(    
-            agent_prompt=f"""
+async def initialize_session(session_id: str) -> None:
+    """Initialize and warmup agent for a new session."""
+    if session_id in user_agents:
+        return  # Already initialized
+    
+    print(f"\n[Session: {session_id[:8]}...] Initializing new session...")
+    
+    # TBD: make this prompt more generic by removing byoung/Neosofia specific references
+    # The instructions are a little too verbose because the search_code tool is a PITA...
+    user_agents[session_id] = await agent_config.create_ai_me_agent(    
+        agent_prompt=f"""
 You are acting as somebody who is personifying {config.bot_full_name}.
 
 CRITICAL RULES FOR search_code TOOL:
@@ -68,19 +72,46 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
 OTHER RULES:
  * Use get_local_info tool ONCE to gather info from markdown documentation (this is RAG-based)
  * Answer based on the information from tool calls
+ * only use ASCII chars for the final output (not tool calling)
  * Do not offer follow ups -- just answer the question
- * add links to sources if they match https://github.com at the end of the output in a references section
+ * Add reference links in a references section at the end of the output if they match github.com
  """,
-            mcp_params=[agent_config.mcp_github_params,agent_config.mcp_time_params],
-        )
+        mcp_params=[agent_config.mcp_github_params,agent_config.mcp_time_params],
+    )
     
-    print("================== USER ===================")
+    # Warmup: establish context and preload tools
+    try:
+        print(f"[Session: {session_id[:8]}...] Running warmup...")
+        await agent_config.run("Please introduce yourself briefly - who you are and what your main expertise is.")
+        print(f"[Session: {session_id[:8]}...] Warmup complete!")
+    except Exception as e:
+        print(f"[Session: {session_id[:8]}...] Warmup failed: {e}")
+
+
+async def get_session_status(request: Request):
+    """Initialize session and return status. Called on page load."""
+    session_id = request.session_hash
+    if session_id not in user_agents:
+        await initialize_session(session_id)
+    return ""
+
+
+async def chat(user_input: str, history, request: Request):
+    session_id = request.session_hash
+    
+    # Initialize agent for this session if not already done
+    if session_id not in user_agents:
+        await initialize_session(session_id)
+    
+    ai_me = user_agents[session_id]
+    
+    print("USER", f"[Session: {session_id[:8]}...]", "=" * 77)
     print(user_input)
 
     # Use agent_config.run() which handles Unicode bracket filtering
     final_output = await agent_config.run(user_input)
 
-    print("================== AGENT ==================")
+    print("AGENT", "=" * 94)
     print(final_output)
 
     return final_output
@@ -92,6 +123,13 @@ if __name__ == "__main__":
                     The digital assistant that you never knew you needed ;)
                     Feel free to ask me anything about my experience, skills, projects, and interests.
                     """)
+        
+        # Hidden component to trigger session initialization on page load
+        session_init = gradio.Textbox(visible=False)
+        
         gradio.ChatInterface(chat, type="messages")
+        
+        # Initialize session when page loads
+        ui.load(get_session_status, inputs=[], outputs=[session_init])
 
     ui.launch(server_name="0.0.0.0", server_port=7860)
