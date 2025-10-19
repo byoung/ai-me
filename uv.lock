@@ -17,6 +17,7 @@ dependencies = [
     { name = "langchain-huggingface" },
     { name = "langchain-mcp-adapters" },
     { name = "langgraph" },
+    { name = "logger" },
     { name = "ollama" },
     { name = "openai" },
     { name = "openai-agents" },
@@ -47,6 +48,7 @@ requires-dist = [
     { name = "langchain-huggingface", specifier = "~=0.3" },
     { name = "langchain-mcp-adapters", specifier = "~=0.1" },
     { name = "langgraph", specifier = "~=0.6" },
+    { name = "logger", specifier = ">=1.4" },
     { name = "ollama", specifier = "~=0.6" },
     { name = "openai", specifier = "~=1.109" },
     { name = "openai-agents", specifier = "~=0.3.2" },
@@ -1340,6 +1342,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/55/f5/edbdf89a162ee0253
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3e/8e/e7a43d907a147e1f87eebdd6737483f9feba52a5d4b20f69d0bd6f2fa22f/langsmith-0.4.31-py3-none-any.whl", hash = "sha256:64f340bdead21defe5f4a6ca330c11073e35444989169f669508edf45a19025f", size = 386347, upload-time = "2025-09-25T04:18:16.69Z" },
 ]
+
+[[package]]
+name = "logger"
+version = "1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/2f/b0d28eaa1e2c1cf64129f8da3fe701888d152677fec708cd0f13e8309e1e/logger-1.4.tar.gz", hash = "sha256:4ecac57133c6376fa215f0fe6b4dc4d60e4d1ad8be005cab4e8a702df682f8b3", size = 1187, upload-time = "2013-10-22T16:49:01.48Z" }
 
 [[package]]
 name = "markdown-it-py"

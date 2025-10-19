@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, computed_field, ConfigDict, SecretStr
 from agents import Agent, Tool, function_tool, Runner
 from agents.result import RunResult
 from agents.mcp import MCPServerStdio
-import os
+import logger
 
 class MCPServerParams(BaseModel):
     """Type-safe MCP server parameters."""
@@ -205,7 +205,25 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         Raises:
             ValueError: If no agent has been created yet
         """
-        result: RunResult = await Runner.run(self._agent, user_input, **runner_kwargs)
+        try:
+            result: RunResult = await Runner.run(self._agent, user_input, **runner_kwargs)
+        except Exception as e:
+            # Check if this is a GitHub API rate limit error
+            error_str = str(e)
+            if "rate limit" in error_str.lower() or "api rate limit exceeded" in error_str.lower():
+                logger.error("⚠️  GITHUB API RATE LIMIT EXCEEDED: %s", error_str)
+                # Return a message informing user that GitHub tools are temporarily unavailable
+                # The agent should still have access to RAG (local info) tools
+                result_text = (
+                    "⚠️ GitHub API rate limit exceeded. I'm currently unable to access "
+                    "live GitHub data, but I can still answer questions based on my "
+                    "knowledge base. Please try again in a few minutes, or ask me something "
+                    "about my documented experience and projects."
+                )
+                return result_text
+            else:
+                # Re-raise if it's not a rate limit error
+                raise
         
         # Post-process: replace Unicode brackets with spaces (they corrupt URLs)
         cleaned_output = result.final_output.replace("】", " ").replace("【", " ")
