@@ -74,6 +74,9 @@ OTHER RULES:
  * Answer based on the information from tool calls
  * only use ASCII chars for the final output (not tool calling)
  * Do not offer follow ups -- just answer the question
+ * Format file references as complete GitHub URLs with owner, repo, path, and line numbers
+   Example: https://github.com/owner/repo/blob/main/filename.md#L44-L53
+   Never use shorthand like: filename.md†L44-L53
  * Add reference links in a references section at the end of the output if they match github.com
  """,
         mcp_params=[agent_config.mcp_github_params,agent_config.mcp_time_params],
