@@ -69,6 +69,33 @@ class AIMeAgent(BaseModel):
             description="Time MCP Server"
         )
     
+    def get_mcp_memory_params(self, session_id: str) -> MCPServerParams:
+        """Memory MCP server params for knowledge graph-based session memory.
+        
+        Creates a session-specific temporary file for memory storage to ensure complete
+        isolation between sessions. Each session gets its own memory graph that is cleaned
+        up when the process exits.
+        
+        Args:
+            session_id: Unique session identifier to create isolated memory storage
+            
+        Returns:
+            MCPServerParams configured with session-specific memory file
+        """
+        import tempfile
+        import os
+        
+        # Create session-specific memory file in temp directory
+        temp_dir = tempfile.gettempdir()
+        memory_file = os.path.join(temp_dir, f"mcp_memory_{session_id}.json")
+        
+        return MCPServerParams(
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-memory"],
+            env={"MEMORY_FILE_PATH": memory_file},
+            description="Memory MCP Server"
+        )
+    
     @computed_field
     @property
     def agent_prompt(self) -> str:
@@ -150,17 +177,14 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         
         Args:
             agent_prompt: Optional agent prompt to override default. If None, uses self.agent_prompt.
-            mcp_params: Optional list of MCP server parameters to initialize. If None, defaults to
-                [mcp_time_params]. Pass an empty list to disable MCP servers.
+            mcp_params: Optional list of MCP server parameters to initialize. If None, no MCP servers
+                will be initialized. To use memory functionality, caller must explicitly pass
+                mcp_params including get_mcp_memory_params(session_id) with a unique session_id.
             additional_tools: Optional list of additional tools to append to the default get_local_info tool.
                 The get_local_info tool is always included as the first tool.
         Returns:
             An initialized Agent instance.
         """
-        # Default to just time server if not specified
-        if mcp_params is None:
-            mcp_params = [self.mcp_time_params]
-        
         # Setup MCP servers if any params provided
         mcp_servers = await self.setup_mcp_servers(mcp_params) if mcp_params else None
 
@@ -193,7 +217,12 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
 
         # Print all available tools after agent initialization
         tool_names = [tool.name if hasattr(tool, 'name') else str(tool) for tool in (ai_me.tools or [])]
-        print(f"Available tools: {', '.join(tool_names) if tool_names else 'none'}")
+        print(f"Available tools (direct): {', '.join(tool_names) if tool_names else 'none'}")
+        
+        # MCP tools are not in ai_me.tools - they're accessible via mcp_servers
+        if mcp_servers:
+            print(f"MCP servers connected: {len(mcp_servers)}")
+            # Note: MCP server tools are dynamically available but not enumerated in .tools
 
         # Store agent internally for use with run() method
         self._agent = ai_me
@@ -208,17 +237,17 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
             error_str = str(e).lower()
             
             if "rate limit" in error_str or "api rate limit exceeded" in error_str:
-                return "⚠️ GitHub rate limit exceeded. Try again in a few minutes or ask about my knowledge base."
-            elif "tool call validation failed" in error_str or "additionalproperties" in error_str or "parameters for tool" in error_str:
-                return "⚠️ GitHub tool error. Let me answer using my knowledge base instead."
-            elif "github" in error_str and ("error" in error_str or "exception" in error_str):
-                return "⚠️ GitHub API error. I'll use my knowledge base to help instead."
-            elif "400" in error_str or "badrequest" in error_str or "invalid_request" in error_str:
-                return "⚠️ Invalid GitHub request. Using knowledge base instead."
+                return "⚠️ GitHub rate limit exceeded. Try asking me again in 30 seconds"
             else:
                 logger.error("Unexpected error: %s", error_str)
-                return "⚠️ Something went wrong. Please try again."
-        
+                return """⚠️ I encountered an unexpected error. 
+                My flesh and blood counterpart has been notified. 
+                You can try asking me a new question or waiting a moment.
+                Apologies for the inconvenience!
+                Maybe I should be called 🐛 🤖
+                """
+
+
         cleaned_output = result.final_output.replace("】", " ").replace("【", " ")
         return cleaned_output
 

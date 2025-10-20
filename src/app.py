@@ -13,30 +13,65 @@ data_config = DataManagerConfig(
 data_manager = DataManager(config=data_config)
 vectorstore = data_manager.setup_vectorstore()
 
-# Initialize agent config with vectorstore
-agent_config = AIMeAgent(
-    bot_full_name=config.bot_full_name,
-    model=config.model,
-    vectorstore=vectorstore,
-    github_token=config.github_token
-)
-
 # Per-session agent storage (keyed by Gradio session_hash)
-user_agents = {}
+# Each session gets its own AIMeAgent instance with session-specific MCP servers
+session_agents = {}
 
 
 async def initialize_session(session_id: str) -> None:
     """Initialize and warmup agent for a new session."""
-    if session_id in user_agents:
+    if session_id in session_agents:
         return  # Already initialized
     
     print(f"\n[Session: {session_id[:8]}...] Initializing new session...")
     
+    # Create a NEW AIMeAgent instance for this session
+    session_agent = AIMeAgent(
+        bot_full_name=config.bot_full_name,
+        model=config.model,
+        vectorstore=vectorstore,
+        github_token=config.github_token
+    )
+    
     # TBD: make this prompt more generic by removing byoung/Neosofia specific references
     # The instructions are a little too verbose because the search_code tool is a PITA...
-    user_agents[session_id] = await agent_config.create_ai_me_agent(    
+    await session_agent.create_ai_me_agent(
         agent_prompt=f"""
 You are acting as somebody who is personifying {config.bot_full_name}.
+
+MEMORY USAGE - MANDATORY WORKFLOW FOR EVERY USER MESSAGE:
+
+1. FIRST ACTION - Read Current Memory:
+   - Call read_graph() to see ALL existing entities and their observations
+   - This prevents errors when adding observations to entities
+
+2. User Identification:
+   - Assume you are interacting with a user entity (e.g., "user_john" if they say "I'm John")
+   - If the user entity doesn't exist in the graph yet, you MUST create it first
+
+3. Gather New Information:
+   - Pay attention to new information about the user:
+     a) Basic Identity (name, age, gender, location, job title, education, etc.)
+     b) Behaviors (interests, habits, activities, etc.)
+     c) Preferences (communication style, preferred language, topics of interest, etc.)
+     d) Goals (aspirations, targets, objectives, etc.)
+     e) Relationships (personal and professional connections)
+
+4. Update Memory - CRITICAL ORDER:
+   - STEP 1: Create missing entities using create_entities() for any new people, organizations, or events
+   - STEP 2: ONLY AFTER entities exist, add facts using add_observations() to existing entities
+   - STEP 3: Connect related entities using create_relations()
+   
+EXAMPLE - User says "Hi, I'm Alice":
+✓ Correct order:
+  1. read_graph() - check if user_alice exists
+  2. create_entities(entities=[{{"name": "user_alice", "entityType": "person", "observations": ["Name is Alice"]}}])
+  3. respond to user
+
+✗ WRONG - will cause errors:
+  1. add_observations(entityName="user_alice", observations=["Name is Alice"]) - ERROR: entity not found!
+
+ALWAYS create entities BEFORE adding observations to them.
 
 GITHUB TOOLS RESTRICTIONS - IMPORTANT:
 DO NOT USE ANY GITHUB TOOL MORE THAN THREE TIMES PER SESSION.
@@ -87,13 +122,20 @@ OTHER RULES:
    Never use shorthand like: filename.md†L44-L53
  * Add reference links in a references section at the end of the output if they match github.com
  """,
-        mcp_params=[agent_config.mcp_github_params,agent_config.mcp_time_params],
+        mcp_params=[
+            session_agent.mcp_github_params,
+            session_agent.mcp_time_params,
+            session_agent.get_mcp_memory_params(session_id)  # Session-specific memory
+        ],
     )
+    
+    # Store the session-specific agent
+    session_agents[session_id] = session_agent
     
     # Warmup: establish context and preload tools
     try:
         print(f"[Session: {session_id[:8]}...] Running warmup...")
-        await agent_config.run("Please introduce yourself briefly - who you are and what your main expertise is.")
+        await session_agent.run("Please introduce yourself briefly - who you are and what your main expertise is.")
         print(f"[Session: {session_id[:8]}...] Warmup complete!")
     except Exception as e:
         print(f"[Session: {session_id[:8]}...] Warmup failed: {e}")
@@ -102,7 +144,7 @@ OTHER RULES:
 async def get_session_status(request: Request):
     """Initialize session and return status. Called on page load."""
     session_id = request.session_hash
-    if session_id not in user_agents:
+    if session_id not in session_agents:
         await initialize_session(session_id)
     return ""
 
@@ -111,16 +153,14 @@ async def chat(user_input: str, history, request: Request):
     session_id = request.session_hash
     
     # Initialize agent for this session if not already done
-    if session_id not in user_agents:
+    if session_id not in session_agents:
         await initialize_session(session_id)
     
-    ai_me = user_agents[session_id]
     
     print("USER", f"[Session: {session_id[:8]}...]", "=" * 77)
     print(user_input)
 
-    # Use agent_config.run() which handles Unicode bracket filtering
-    final_output = await agent_config.run(user_input)
+    final_output = await session_agents[session_id].run(user_input)
 
     print("AGENT", "=" * 94)
     print(final_output)
