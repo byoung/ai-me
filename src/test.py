@@ -7,16 +7,6 @@ import pytest_asyncio
 import re
 import sys
 import os
-from config import setup_logger
-
-logger = setup_logger(__name__)
-
-# Something about these tests makes me feel yucky. Big, brittle, and slow. BBS?
-import pytest
-import pytest_asyncio
-import re
-import sys
-import os
 
 # Something about these tests makes me feel yucky. Big, brittle, and slow. BBS?
 # Couple ideas to make them better:
@@ -39,6 +29,11 @@ os.environ["LOCAL_DOCS"] = "**/*.md"
 
 
 # Add src directory to path to allow imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from config import setup_logger
+
+logger = setup_logger(__name__)# Add src directory to path to allow imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import setup_logger
