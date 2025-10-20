@@ -116,7 +116,7 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
 - get_file_contents(owner="byoung", repo="ai-me", path="README.md", ref="master")
 
 OTHER RULES:
- * Use get_local_info tool ONCE to gather info from markdown documentation (this is RAG-based)
+ * ALWAYS USE THE get_local_info tool ONCE to gather info from my documentation (this is RAG-based)
  * Answer based on the information from tool calls
  * only use ASCII chars for the final output (not tool calling)
  * Do not offer follow ups -- just answer the question
