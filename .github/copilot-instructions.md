@@ -43,3 +43,4 @@ This is a personal AI agent application that creates an agentic version of real 
 1. **Model naming**: For some reason OpenAI and Groq can't agree to be concise so the default model name is `"openai/openai/gpt-oss-120b"` 
 1. **uv vs pip**: Project uses `uv` for lock files; don't use `pip` directly
 1. **ChromaDB persistence**: EphemeralClient means vectorstore rebuilt on restart
+1. **VPN Warning**: Groq API blocks VPN connections. If tests/app fail with 403 errors, disconnect from VPN

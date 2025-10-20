@@ -3,11 +3,63 @@ Configuration management for ai-me application.
 Centralizes environment variables, API clients, and application defaults.
 """
 import os
+import logging
 from typing import Optional, List, Union
 from pydantic import Field, field_validator, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from openai import AsyncOpenAI
 from agents import set_default_openai_client, set_tracing_export_api_key
+
+
+def setup_logger(name: str) -> logging.Logger:
+    """
+    Create and configure a logger with consistent syslog-style formatting.
+    Multi-line messages will have continuation lines indented for readability.
+    
+    Log level can be controlled via LOG_LEVEL environment variable (DEBUG, INFO, WARNING, ERROR).
+    Defaults to INFO if not set.
+    
+    Format: <timestamp> <hostname> <process>[<pid>]: <level> <message>
+    Example: Oct 20 14:30:45 hostname python[12345]: INFO Message here
+             Oct 20 14:30:45 hostname python[12345]:      continuation line
+    
+    Args:
+        name: The name of the logger (typically __name__ from the calling module)
+    
+    Returns:
+        A configured logger instance
+    """
+    import socket
+    
+    # Configure root logger if not already configured
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        # Get log level from environment variable, default to INFO
+        log_level_name = os.getenv('LOG_LEVEL', 'INFO').upper()
+        log_level = getattr(logging, log_level_name, logging.INFO)
+        
+        # Custom formatter that indents multi-line messages
+        fmt = '%(asctime)s %(hostname)s %(name)s[%(process)d]: %(levelname)s %(message)s'
+        formatter = logging.Formatter(fmt, datefmt='%b %d %H:%M:%S')
+        original_format = formatter.format
+        formatter.format = lambda record: (
+            lambda s: s if '\n' not in s else 
+            '\n'.join([s.split('\n')[0]] + [' ' * (s.index(': ') + 2) + line 
+                      for line in s.split('\n')[1:]])
+        )(original_format(record))
+        
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        # Add hostname to records via filter on handler
+        handler.addFilter(lambda record: setattr(record, 'hostname', socket.gethostname()) or True)
+        root_logger.addHandler(handler)
+        root_logger.setLevel(log_level)
+    
+    logger = logging.getLogger(name)
+    return logger
+
+# Initialize module-level logger
+logger = setup_logger(__name__)
 
 class Config(BaseSettings):
     """Central configuration class for ai-me application with Pydantic validation."""
@@ -82,7 +134,7 @@ class Config(BaseSettings):
         set_default_openai_client(self.openai_client)
         
         # Set tracing API key AFTER setting default client
-        print("Setting tracing export API key for agents.")
+        logger.info("Setting tracing export API key for agents.")
         set_tracing_export_api_key(self.openai_api_key.get_secret_value())
     
     def _safe_repr(self) -> str:

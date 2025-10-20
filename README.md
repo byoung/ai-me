@@ -60,6 +60,9 @@ GITHUB_PERSONAL_ACCESS_TOKEN=<for searching GitHub repos>
 BOT_FULL_NAME=<full name of the persona>
 APP_NAME=<name that appears on HF chat page>
 GITHUB_REPOS=<comma-separated list of public repos: owner/repo,owner/repo>
+
+# Optional: Set log level (DEBUG, INFO, WARNING, ERROR). Defaults to INFO.
+LOG_LEVEL=INFO
 ```
 
 **Note**: A Git pre-commit hook is installed at `.git/hooks/pre-commit` that automatically clears all notebook outputs before committing. This keeps the repository clean and reduces diff noise.

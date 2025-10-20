@@ -7,6 +7,16 @@ import pytest_asyncio
 import re
 import sys
 import os
+from config import setup_logger
+
+logger = setup_logger(__name__)
+
+# Something about these tests makes me feel yucky. Big, brittle, and slow. BBS?
+import pytest
+import pytest_asyncio
+import re
+import sys
+import os
 
 # Something about these tests makes me feel yucky. Big, brittle, and slow. BBS?
 # Couple ideas to make them better:
@@ -31,6 +41,10 @@ os.environ["LOCAL_DOCS"] = "**/*.md"
 # Add src directory to path to allow imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from config import setup_logger
+
+logger = setup_logger(__name__)
+
 from config import Config
 from agent import AIMeAgent
 from data import DataManager, DataManagerConfig
@@ -52,14 +66,14 @@ async def ai_me_agent():
     test_data_dir = os.path.join(project_root, "test_data")
     
     # Initialize data manager and vectorstore with test data
-    print(f"Setting up vectorstore with test data from {test_data_dir}...", flush=True)
+    logger.info(f"Setting up vectorstore with test data from {test_data_dir}...")
     data_config = DataManagerConfig(
         github_repos=config.github_repos,
         doc_root=test_data_dir  # Use test_data directory instead of default docs/
     )
     data_manager = DataManager(config=data_config)
     vectorstore = data_manager.setup_vectorstore()
-    print(f"Vectorstore setup complete with {vectorstore._collection.count()} documents", flush=True)
+    logger.info(f"Vectorstore setup complete with {vectorstore._collection.count()} documents")
     
     # Initialize agent config with vectorstore
     agent_config = AIMeAgent(
@@ -71,14 +85,14 @@ async def ai_me_agent():
     
     # Create the agent (without MCP servers for faster testing - tests 1 and 3 only need vectorstore)
     # Temperature is controlled via config.temperature (default 1.0, or set TEMPERATURE in .env)
-    print("Creating ai-me agent...", flush=True)
+    logger.info("Creating ai-me agent...")
     await agent_config.create_ai_me_agent(
         agent_config.agent_prompt, 
         mcp_params=[]  # Empty list disables MCP servers
     )
-    print("Agent created successfully", flush=True)
-    print("Note: MCP servers disabled for these tests (only vectorstore RAG is needed)", flush=True)
-    print(f"Note: Temperature set to {config.temperature} (from config)", flush=True)
+    logger.info("Agent created successfully")
+    logger.info("Note: MCP servers disabled for these tests (only vectorstore RAG is needed)")
+    logger.info(f"Note: Temperature set to {config.temperature} (from config)")
     
     # Return the agent_config instance so tests can use agent_config.run()
     return agent_config
@@ -91,19 +105,19 @@ async def test_rear_knowledge_contains_it245(ai_me_agent):
     This tests that the agent can retrieve and return specific technical information.
     """
     query = "What do you know about ReaR?"
-    print(f"\n{'='*60}\nTest 1: {query}\n{'='*60}", flush=True)
+    logger.info(f"\n{'='*60}\nTest 1: {query}\n{'='*60}")
     
-    print("Running agent query...", flush=True)
+    logger.info("Running agent query...")
     response = await ai_me_agent.run(query, max_turns=30)
     
-    print(f"Response:\n{response}\n{'='*60}", flush=True)
+    logger.info(f"Response:\n{response}\n{'='*60}")
     
     # Assert that IT-245 appears in the response (handle both regular and Unicode hyphens)
     # LLMs love fancy typography: regular hyphen '-' (U+002D) vs non-breaking hyphen '‑' (U+2011)
     assert "IT-245" in response or "IT‑245" in response, (
         f"Expected 'IT-245' in response but got: {response}"
     )
-    print("✓ Test passed: Response contains 'IT-245'", flush=True)
+    logger.info("✓ Test passed: Response contains 'IT-245'")
 
 
 @pytest.mark.asyncio
@@ -115,11 +129,11 @@ async def test_github_commits_contains_shas(ai_me_agent):
     NOTE: This test is skipped by default as it requires MCP servers which slow down testing.
     """
     query = "Give me a summary of all the commits you've made in the last week"
-    print(f"\n{'='*60}\nTest 2: {query}\n{'='*60}", flush=True)
+    logger.info(f"\n{'='*60}\nTest 2: {query}\n{'='*60}")
     
     response = await ai_me_agent.run(query, max_turns=30)
     
-    print(f"Response:\n{response}\n{'='*60}")
+    logger.info(f"Response:\n{response}\n{'='*60}")
     
     # Look for git SHA patterns (7-40 character hex strings)
     # Git SHAs are typically 7+ characters when abbreviated, 40 when full
@@ -129,7 +143,7 @@ async def test_github_commits_contains_shas(ai_me_agent):
     assert len(shas_found) > 0, (
         f"Expected to find commit SHAs in response but found none. Response: {response}"
     )
-    print(f"✓ Test passed: Found {len(shas_found)} commit SHA(s): {shas_found}")
+    logger.info(f"✓ Test passed: Found {len(shas_found)} commit SHA(s): {shas_found}")
 
 
 @pytest.mark.asyncio
@@ -139,12 +153,12 @@ async def test_unknown_person_contains_negative_response(ai_me_agent):
     This tests that the agent properly indicates when it doesn't have information.
     """
     query = "who is slartibartfast?"
-    print(f"\n{'='*60}\nTest 3: {query}\n{'='*60}")
+    logger.info(f"\n{'='*60}\nTest 3: {query}\n{'='*60}")
     
     response_raw = await ai_me_agent.run(query, max_turns=30)
     response = response_raw.lower()  # Convert to lowercase for matching
     
-    print(f"Response:\n{response}\n{'='*60}")
+    logger.info(f"Response:\n{response}\n{'='*60}")
     
     # Check for negative indicators (wasn't, could not, don't know, no information, etc.)
     # LLMs use smart quotes: regular apostrophe "'" (U+0027) vs right single quote "'" (U+2019)
@@ -162,12 +176,12 @@ async def test_unknown_person_contains_negative_response(ai_me_agent):
     normalized_response = ' '.join(normalized_response.split())  # normalize all whitespace
     
     found_indicator = any(indicator in normalized_response for indicator in negative_indicators)
-    print(f"Found negative indicator: {found_indicator}")
+    logger.info(f"Found negative indicator: {found_indicator}")
     assert found_indicator, (
         f"Expected response to contain a negative indicator (wasn't/could not/etc.) "
         f"but got: {response}"
     )
-    print(f"✓ Test passed: Response contains negative indicator")
+    logger.info(f"✓ Test passed: Response contains negative indicator")
 
 
 @pytest.mark.asyncio
@@ -180,13 +194,13 @@ async def test_carol_knowledge_contains_product(ai_me_agent):
     response_raw = await ai_me_agent.run(query, max_turns=30)
     response = response_raw.lower()  # Convert to lowercase for matching
     
-    print(f"Response:\n{response}\n{'='*60}")
+    logger.info(f"Response:\n{response}\n{'='*60}")
     
     # Assert that 'product' appears in the response (Carol is Product Owner)
     assert "product" in response, (
         f"Expected 'product' in response but got: {response}"
     )
-    print("✓ Test passed: Response contains 'product'", flush=True)
+    logger.info("✓ Test passed: Response contains 'product'")
 
 
 if __name__ == "__main__":

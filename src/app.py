@@ -1,8 +1,11 @@
-from config import Config
+from config import Config, setup_logger
 from agent import AIMeAgent
 from data import DataManager, DataManagerConfig
 import gradio
 from gradio import Request
+import json
+
+logger = setup_logger(__name__)
 
 config = Config()
 
@@ -23,7 +26,7 @@ async def initialize_session(session_id: str) -> None:
     if session_id in session_agents:
         return  # Already initialized
     
-    print(f"\n[Session: {session_id[:8]}...] Initializing new session...")
+    logger.info(f"[Session: {session_id[:8]}...] Initializing new session...")
     
     # Create a NEW AIMeAgent instance for this session
     session_agent = AIMeAgent(
@@ -134,11 +137,11 @@ OTHER RULES:
     
     # Warmup: establish context and preload tools
     try:
-        print(f"[Session: {session_id[:8]}...] Running warmup...")
+        logger.info(f"[Session: {session_id[:8]}...] Running warmup...")
         await session_agent.run("Please introduce yourself briefly - who you are and what your main expertise is.")
-        print(f"[Session: {session_id[:8]}...] Warmup complete!")
+        logger.info(f"[Session: {session_id[:8]}...] Warmup complete!")
     except Exception as e:
-        print(f"[Session: {session_id[:8]}...] Warmup failed: {e}")
+        logger.info(f"[Session: {session_id[:8]}...] Warmup failed: {e}")
 
 
 async def get_session_status(request: Request):
@@ -157,13 +160,13 @@ async def chat(user_input: str, history, request: Request):
         await initialize_session(session_id)
     
     
-    print("USER", f"[Session: {session_id[:8]}...]", "=" * 77)
-    print(user_input)
+    json_response = {"session_id": session_id, "user_input": user_input}
+    logger.info(json_response)
 
     final_output = await session_agents[session_id].run(user_input)
 
-    print("AGENT", "=" * 94)
-    print(final_output)
+    json_response = {"session_id": session_id, "agent_output": final_output}
+    logger.info(json_response)
 
     return final_output
 

@@ -2,19 +2,15 @@
 Agent configuration and MCP server setup.
 Handles agent-specific configuration like MCP servers and prompts.
 """
-import logging
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field, computed_field, ConfigDict, SecretStr
 from agents import Agent, Tool, function_tool, Runner
 from agents.result import RunResult
 from agents.mcp import MCPServerStdio
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from config import setup_logger
+import traceback
+ 
+logger = setup_logger(__name__)
 
 class MCPServerParams(BaseModel):
     """Type-safe MCP server parameters."""
@@ -115,27 +111,25 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         for i, params in enumerate(mcp_params_list):
             server_name = params.description or f"Server {i+1}"
             try:
-                print(f"\n=== Attempting to connect to {server_name} ===")
-                print(f"Command: {params.command}")
-                print(f"Args: {params.args}")
-                print(f"Env vars: {list(params.env.keys()) if params.env else 'None'}")
-                
+                logger.info(f"Attempting to connect to {server_name}")
+                logger.debug(f"Command: {params.command}")
+                logger.debug(f"Args: {params.args}")
+                logger.debug(f"Env vars: {list(params.env.keys()) if params.env else 'None'}")
+
                 server = MCPServerStdio(params.model_dump(), client_session_timeout_seconds=30)
-                print(f"MCPServerStdio instance created, calling connect()...")
                 await server.connect()
-                print(f"✓ {server_name} connected successfully")
+                logger.info(f"✓ {server_name} connected successfully")
                 mcp_servers_local.append(server)
                 
             except Exception as e:
-                print(f"✗ {server_name} failed to connect")
-                print(f"  Error type: {type(e).__name__}")
-                print(f"  Error message: {e}")
+                logger.error(f"✗ {server_name} failed to connect")
+                logger.error(f"  Error type: {type(e).__name__}")
+                logger.error(f"  Error message: {e}")
                 # Print full traceback for debugging
-                import traceback
-                print(f"  Traceback:\n{traceback.format_exc()}")
+                logger.error(f"  Traceback:\n{traceback.format_exc()}")
                 continue
 
-        print(f"\n=== MCP Server Summary: {len(mcp_servers_local)}/{len(mcp_params_list)} connected ===\n")
+        logger.info(f"MCP Server Summary: {len(mcp_servers_local)}/{len(mcp_params_list)} connected")
         return mcp_servers_local
     
     def get_local_info_tool(self):
@@ -146,10 +140,10 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
             """get more context based on the subject of the question.
             Our vector store will contain information about our personal and professional
             experience in all things technology."""
-            print("QUERY:", query)
+            logger.info(f"QUERY: {query}")
             docs_content = ""
             retrieved_docs = self.vectorstore.similarity_search_with_score(query, k=5)
-            print(f"Retrieved {len(retrieved_docs)} documents from vector store.")
+            logger.info(f"Retrieved {len(retrieved_docs)} documents from vector store.")
             for doc, score in retrieved_docs:
                 # Handle both GitHub and local documents
                 if 'github_repo' in doc.metadata:
@@ -160,8 +154,8 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
                     # Local document - use source path
                     source_link = f"Source: {doc.metadata.get('source', 'local document')}\n"
 
-                print(f" --------------- {doc.metadata.get('source', 'unknown')} ({score}) ---------------")
-                print(f"{doc.page_content[:100]}")
+                logger.info({ "filename": doc.metadata.get('source', 'unknown'), "score": score })
+                logger.debug(f"{doc.page_content[:100]}")
 
                 docs_content += f"Source: {source_link}" + doc.page_content + "\n\n"
 
@@ -190,7 +184,7 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
 
         # Use provided prompt or fall back to default
         prompt = agent_prompt if agent_prompt is not None else self.agent_prompt
-        print(f"Creating ai-me agent with prompt: {prompt}")
+        logger.debug(f"Creating ai-me agent with prompt: {prompt}")
         
         # Build tools list - get_local_info is always the default first tool
         tools = [self.get_local_info_tool()]
@@ -199,7 +193,7 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         if additional_tools:
             tools.extend(additional_tools)
 
-        print(f"Creating ai-me agent with tools: {[tool.name for tool in tools]}")
+        logger.info(f"Creating ai-me agent with tools: {[tool.name for tool in tools]}")
 
         # Pass MCP servers directly to main agent instead of wrapping in sub-agent
         agent_kwargs = {
@@ -217,11 +211,11 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
 
         # Print all available tools after agent initialization
         tool_names = [tool.name if hasattr(tool, 'name') else str(tool) for tool in (ai_me.tools or [])]
-        print(f"Available tools (direct): {', '.join(tool_names) if tool_names else 'none'}")
+        logger.info(f"Available tools (direct): {', '.join(tool_names) if tool_names else 'none'}")
         
         # MCP tools are not in ai_me.tools - they're accessible via mcp_servers
         if mcp_servers:
-            print(f"MCP servers connected: {len(mcp_servers)}")
+            logger.info(f"MCP servers connected: {len(mcp_servers)}")
             # Note: MCP server tools are dynamically available but not enumerated in .tools
 
         # Store agent internally for use with run() method

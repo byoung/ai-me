@@ -18,6 +18,9 @@ import chromadb
 from chromadb.config import Settings
 import shutil
 import re
+from config import setup_logger
+
+logger = setup_logger(__name__)
 
 class DataManagerConfig(BaseModel):
     """Configuration for DataManager with Pydantic validation."""
@@ -77,11 +80,11 @@ class DataManager:
         """
         Load documents from local directory. Returns empty list if directory not found.
         """
-        print(f"Loading local documents from: {self.config.doc_root}")
+        logger.info(f"Loading local documents from: {self.config.doc_root}")
         
         # Check if directory exists first
         if not os.path.exists(self.config.doc_root):
-            print(f"Warning: Directory not found: {self.config.doc_root} - skipping local documents")
+            logger.info(f"Warning: Directory not found: {self.config.doc_root} - skipping local documents")
             return []
         
         all_documents = []
@@ -89,7 +92,7 @@ class DataManager:
         # Iterate over all glob patterns
         for pattern in self.config.doc_load_local:
             try:
-                print(f"  Loading pattern: {pattern}")
+                logger.info(f"  Loading pattern: {pattern}")
                 loader = DirectoryLoader(
                     self.config.doc_root,
                     glob=pattern,
@@ -97,16 +100,16 @@ class DataManager:
                     loader_kwargs={'encoding': 'utf-8'}
                 )
                 documents = loader.load()
-                print(f"    Found {len(documents)} documents")
+                logger.info(f"    Found {len(documents)} documents")
                 all_documents.extend(documents)
             except Exception as e:
-                print(
+                logger.info(
                     f"  Error loading pattern {pattern}: {e}"
                     f" - skipping this pattern"
                 )
                 continue
         
-        print(f"Loaded {len(all_documents)} total local documents.")
+        logger.info(f"Loaded {len(all_documents)} total local documents.")
         return all_documents
     
     def load_github_documents(self, repos: List[str] = None,
@@ -141,12 +144,12 @@ class DataManager:
         tmp_dir = "./tmp"
 
         if os.path.exists(tmp_dir) and cleanup_tmp:
-            print(f"Cleaning up existing tmp directory: {tmp_dir}")
+            logger.info(f"Cleaning up existing tmp directory: {tmp_dir}")
             shutil.rmtree(tmp_dir)
 
-        print(f"Loading GitHub documents from {len(repos)} repos {repos}")
+        logger.info(f"Loading GitHub documents from {len(repos)} repos {repos}")
         for repo in repos:
-            print(f"Loading GitHub repo: {repo}")
+            logger.info(f"Loading GitHub repo: {repo}")
             try:
                 loader = GitLoader(
                     clone_url=f"https://github.com/{repo}",
@@ -160,13 +163,13 @@ class DataManager:
                 for doc in docs:
                     doc.metadata["github_repo"] = repo
                 
-                print(f"  Loaded {len(docs)} documents from {repo}")
+                logger.info(f"  Loaded {len(docs)} documents from {repo}")
                 all_docs.extend(docs)
             except Exception as e:
-                print(f"  Error loading repo {repo}: {e} - skipping")
+                logger.info(f"  Error loading repo {repo}: {e} - skipping")
                 continue
         
-        print(f"Loaded {len(all_docs)} total GitHub documents.")
+        logger.info(f"Loaded {len(all_docs)} total GitHub documents.")
         return all_docs
     
     def process_documents(self, docs: List[Document]) -> List[Document]:
@@ -181,7 +184,7 @@ class DataManager:
         """
         processed = []
         for doc in docs:
-            print(f"Processing: {doc.metadata['source']}")
+            logger.info(f"Processing: {doc.metadata['source']}")
             
             # Fix baseless links to point to GitHub (if from a GitHub repo)
             if "github_repo" in doc.metadata:
@@ -208,7 +211,7 @@ class DataManager:
         Returns:
             List of chunked documents with both original metadata and header metadata
         """
-        print(f"Chunking {len(documents)} documents...")
+        logger.info(f"Chunking {len(documents)} documents...")
         
         # Define headers to split on (h1, h2, h3)
         headers_to_split_on = [("#", "H1"), ("##", "H2"), ("###", "H3")]
@@ -233,7 +236,7 @@ class DataManager:
         size_splitter = MarkdownTextSplitter(chunk_size=self.config.chunk_size)
         final_chunks = size_splitter.split_documents(all_chunks)
         
-        print(f"Created {len(final_chunks)} chunks")
+        logger.info(f"Created {len(final_chunks)} chunks")
         return final_chunks
     
     def load_and_process_all(self, github_repos: List[str] = None) -> List[Document]:
@@ -271,7 +274,7 @@ class DataManager:
             HuggingFace embeddings instance
         """
         if self._embeddings is None:
-            print(f"Loading embeddings model: {self.config.embedding_model}")
+            logger.info(f"Loading embeddings model: {self.config.embedding_model}")
             self._embeddings = HuggingFaceEmbeddings(model_name=self.config.embedding_model)
         return self._embeddings
     
@@ -295,11 +298,11 @@ class DataManager:
         if reset:
             try:
                 chroma_client.delete_collection(self.config.db_name)
-                print(f"Dropped existing collection: {self.config.db_name}")
+                logger.info(f"Dropped existing collection: {self.config.db_name}")
             except Exception:
                 pass  # Collection doesn't exist yet
         
-        print(f"Creating vectorstore with {len(chunks)} chunks...")
+        logger.info(f"Creating vectorstore with {len(chunks)} chunks...")
         vectorstore = Chroma.from_documents(
             documents=chunks,
             embedding=embeddings,
@@ -308,7 +311,7 @@ class DataManager:
         )
         
         count = vectorstore._collection.count()
-        print(f"Vectorstore created with {count} documents")
+        logger.info(f"Vectorstore created with {count} documents")
         
         self._vectorstore = vectorstore
         return vectorstore
@@ -325,7 +328,7 @@ class DataManager:
         Returns:
             Chroma vectorstore instance ready for queries.
         """
-        print("Setting up vectorstore...")
+        logger.info("Setting up vectorstore...")
         chunks = self.load_and_process_all(github_repos=github_repos)
         return self.create_vectorstore(chunks, reset=reset)
     
@@ -335,7 +338,7 @@ class DataManager:
         given filename. Returns a list of (doc_id, metadata, document).
         """
         all_docs = self._vectorstore.get()
-        print(f"Searching for chunks from file: {filename}")
+        logger.info(f"Searching for chunks from file: {filename}")
 
         ids = all_docs.get("ids", [])
         metadatas = all_docs.get("metadatas", [])
@@ -347,14 +350,14 @@ class DataManager:
             if metadata.get("file_path", "").endswith(filename)
         ]
 
-        print(f"Found {len(matched)} chunks from {filename}:\n")
+        logger.info(f"Found {len(matched)} chunks from {filename}:\n")
         for i, (doc_id, metadata, content) in enumerate(matched, 1):
-            print("=" * 100)
-            print(f"CHUNK {i}")
-            print(f"Metadata: {metadata}")
-            print("=" * 100)
-            print(content)
-            print()
+            logger.info("=" * 100)
+            logger.info(f"CHUNK {i}")
+            logger.info(f"Metadata: {metadata}")
+            logger.info("=" * 100)
+            logger.info(content)
+            logger.info("")
 
     @property
     def vectorstore(self) -> Optional[Chroma]:
