@@ -35,9 +35,6 @@ class AIMeAgent(BaseModel):
     def mcp_github_params(self) -> MCPServerParams:
         """GitHub MCP server params with token injected from instance.
         
-        Uses npx to run the GitHub MCP server directly without Docker.
-        This works in environments without Docker daemon access (like HF Spaces).
-        
         Note: The GitHub MCP server CLI doesn't properly support --toolsets and --read-only
         flags via npx, so we connect to all tools but filter at the agent level via the
         tools passed to create_agent(). See the chat() method for how tools are filtered.
@@ -46,12 +43,12 @@ class AIMeAgent(BaseModel):
             command="npx",
             args=[
                 "-y",
-                "@modelcontextprotocol/server-github",
+                "@github/github-mcp-server",
             ],
             env={
                 "GITHUB_PERSONAL_ACCESS_TOKEN": self.github_token.get_secret_value() if self.github_token else "",
             },
-            description="GitHub MCP Server"
+            description="GitHub MCP Server (Official)"
         )
     
     @computed_field
