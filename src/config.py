@@ -75,6 +75,7 @@ def setup_logger(name: str) -> logging.Logger:
         loki_password = os.getenv('LOKI_PASSWORD')
         
         if loki_url and loki_username and loki_password:
+            root_logger.info(f"Attempting to configure Loki logging to: {loki_url}")
             try:
                 # Create async queue for non-blocking logging
                 log_queue = Queue(maxsize=1000)  # Buffer up to 1000 log messages
@@ -86,23 +87,48 @@ def setup_logger(name: str) -> logging.Logger:
                     auth=(loki_username, loki_password),
                     version="1",
                 )
-                # Prevent Loki errors from propagating and causing logging loops
-                loki_handler.handleError = lambda record: None
+                loki_handler.setLevel(logging.DEBUG)  # Ensure handler accepts all log levels
+                
+                # Log Loki errors to console instead of suppressing them
+                def handle_loki_error(record):
+                    console_handler.emit(logging.LogRecord(
+                        name="loki_handler",
+                        level=logging.WARNING,
+                        pathname="",
+                        lineno=0,
+                        msg=f"Loki handler error: {record}",
+                        args=(),
+                        exc_info=None
+                    ))
+                loki_handler.handleError = handle_loki_error
                 
                 # QueueListener processes logs asynchronously in background
                 queue_listener = QueueListener(log_queue, loki_handler, respect_handler_level=True)
                 queue_listener.start()
                 
+                # Store listener in root logger to prevent garbage collection
+                root_logger._loki_queue_listener = queue_listener
+                
                 # QueueHandler sends logs to queue without blocking
                 queue_handler = QueueHandler(log_queue)
+                queue_handler.setLevel(logging.DEBUG)  # Ensure handler accepts all log levels
                 root_logger.addHandler(queue_handler)
                 
                 root_logger.info(f"Grafana Loki async logging enabled: {loki_url}")
+                root_logger.info(f"Loki configured with tags: {loki_handler.tags}")
             except Exception as e:
-                root_logger.warning(f"Failed to setup Grafana Loki logging: {e}")
+                root_logger.warning(f"Failed to setup Grafana Loki logging: {e}", exc_info=True)
+        else:
+            missing = []
+            if not loki_url:
+                missing.append("LOKI_URL")
+            if not loki_username:
+                missing.append("LOKI_USERNAME")
+            if not loki_password:
+                missing.append("LOKI_PASSWORD")
+            root_logger.info(f"Loki logging disabled (missing: {', '.join(missing)})")
         
         root_logger.setLevel(log_level)
-        root_logger.info(f"Root logger configured: level={log_level_name}, handlers={len(root_logger.handlers)}")
     
     logger = logging.getLogger(name)
     return logger
