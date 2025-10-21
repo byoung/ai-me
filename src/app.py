@@ -120,9 +120,9 @@ OTHER RULES:
  * Answer based on the information from tool calls
  * only use ASCII chars for the final output (not tool calling)
  * Do not offer follow ups -- just answer the question
- * Format file references as complete GitHub URLs with owner, repo, path, and line numbers
-   Example: https://github.com/owner/repo/blob/main/filename.md#L44-L53
-   Never use shorthand like: filename.md†L44-L53
+ * Format file references as complete GitHub URLs with owner, repo, path, and filename
+   Example: https://github.com/owner/repo/blob/main/filename.md
+   Never use shorthand like: filename.md†L44-L53 or source†L44-L53
  * Add reference links in a references section at the end of the output if they match github.com
  """,
         mcp_params=[
@@ -161,12 +161,12 @@ async def chat(user_input: str, history, request: Request):
     
     
     json_response = {"session_id": session_id, "user_input": user_input}
-    logger.info(json_response)
+    logger.info(json.dumps(json_response))
 
     final_output = await session_agents[session_id].run(user_input)
 
     json_response = {"session_id": session_id, "agent_output": final_output}
-    logger.info(json_response)
+    logger.info(json.dumps(json_response))
 
     return final_output
 

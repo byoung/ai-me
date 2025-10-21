@@ -9,6 +9,11 @@ from pydantic import Field, field_validator, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from openai import AsyncOpenAI
 from agents import set_default_openai_client, set_tracing_export_api_key
+from logging_loki import LokiHandler
+from dotenv import load_dotenv
+
+# Load .env file early so logger setup can access environment variables
+load_dotenv()
 
 
 def setup_logger(name: str) -> logging.Logger:
@@ -18,6 +23,11 @@ def setup_logger(name: str) -> logging.Logger:
     
     Log level can be controlled via LOG_LEVEL environment variable (DEBUG, INFO, WARNING, ERROR).
     Defaults to INFO if not set.
+    
+    Remote logging to Grafana Loki can be enabled by setting:
+    - LOKI_URL: Grafana Loki endpoint (e.g., https://logs-prod-us-central1.grafana.net)
+    - LOKI_USERNAME: Grafana Cloud username (typically a number)
+    - LOKI_PASSWORD: Grafana Cloud API key
     
     Format: <timestamp> <hostname> <process>[<pid>]: <level> <message>
     Example: Oct 20 14:30:45 hostname python[12345]: INFO Message here
@@ -48,11 +58,50 @@ def setup_logger(name: str) -> logging.Logger:
                       for line in s.split('\n')[1:]])
         )(original_format(record))
         
-        handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
+        # Console handler (always present)
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
         # Add hostname to records via filter on handler
-        handler.addFilter(lambda record: setattr(record, 'hostname', socket.gethostname()) or True)
-        root_logger.addHandler(handler)
+        console_handler.addFilter(
+            lambda record: setattr(record, 'hostname', socket.gethostname()) or True
+        )
+        root_logger.addHandler(console_handler)
+        
+        # Grafana Loki handler (optional, for remote logging)
+        loki_url = os.getenv('LOKI_URL')
+        loki_username = os.getenv('LOKI_USERNAME')
+        loki_password = os.getenv('LOKI_PASSWORD')
+        
+        if loki_url and loki_username and loki_password:
+            try:
+                from logging.handlers import QueueHandler, QueueListener
+                from queue import Queue
+                
+                # Create async queue for non-blocking logging
+                log_queue = Queue(maxsize=1000)  # Buffer up to 1000 log messages
+                
+                # Loki handler processes logs from queue in background thread
+                loki_handler = LokiHandler(
+                    url=f"{loki_url}/loki/api/v1/push",
+                    tags={"application": "ai-me", "environment": os.getenv('ENV', 'production')},
+                    auth=(loki_username, loki_password),
+                    version="1",
+                )
+                # Prevent Loki errors from propagating and causing logging loops
+                loki_handler.handleError = lambda record: None
+                
+                # QueueListener processes logs asynchronously in background
+                queue_listener = QueueListener(log_queue, loki_handler, respect_handler_level=True)
+                queue_listener.start()
+                
+                # QueueHandler sends logs to queue without blocking
+                queue_handler = QueueHandler(log_queue)
+                root_logger.addHandler(queue_handler)
+                
+                root_logger.info(f"Grafana Loki async logging enabled: {loki_url}")
+            except Exception as e:
+                root_logger.warning(f"Failed to setup Grafana Loki logging: {e}")
+        
         root_logger.setLevel(log_level)
     
     logger = logging.getLogger(name)

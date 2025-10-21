@@ -39,6 +39,7 @@ Deployed as a Gradio chatbot on Hugging Face Spaces.
 - **Gradio** for UI and Hugging Face Spaces deployment
 - **Groq** as primary LLM provider for fast inference
 - **Pydantic** for type-safe configuration
+- **Grafana Cloud Loki** for remote logging (optional)
 
 ## Getting Started
 
@@ -106,10 +107,16 @@ GROQ_API_KEY
 OPENAI_API_KEY
 GITHUB_PERSONAL_ACCESS_TOKEN
 
+# Optional: Grafana Cloud Loki (Remote Logging)
+LOKI_URL
+LOKI_USERNAME
+LOKI_PASSWORD
+
 # Public
 APP_NAME
 BOT_FULL_NAME
 GITHUB_REPOS
+ENV  # e.g., "production" - used for log tagging
 ```
 
 ## Design Principles
