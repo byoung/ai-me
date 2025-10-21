@@ -8,6 +8,7 @@ import socket
 from typing import Optional, List, Union
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
+from base64 import b64encode
 
 from pydantic import Field, field_validator, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -75,49 +76,32 @@ def setup_logger(name: str) -> logging.Logger:
         loki_password = os.getenv('LOKI_PASSWORD')
         
         if loki_url and loki_username and loki_password:
-            root_logger.info(f"Attempting to configure Loki logging to: {loki_url}")
             try:
                 # Create async queue for non-blocking logging
                 log_queue = Queue(maxsize=1000)  # Buffer up to 1000 log messages
                 
                 # Loki handler processes logs from queue in background thread
+                loki_tags = {"application": "ai-me", "environment": os.getenv('ENV', 'production')}
                 loki_handler = LokiHandler(
                     url=f"{loki_url}/loki/api/v1/push",
-                    tags={"application": "ai-me", "environment": os.getenv('ENV', 'production')},
+                    tags=loki_tags,
                     auth=(loki_username, loki_password),
                     version="1",
                 )
-                loki_handler.setLevel(logging.DEBUG)  # Ensure handler accepts all log levels
-                
-                # Log Loki errors to console instead of suppressing them
-                def handle_loki_error(record):
-                    console_handler.emit(logging.LogRecord(
-                        name="loki_handler",
-                        level=logging.WARNING,
-                        pathname="",
-                        lineno=0,
-                        msg=f"Loki handler error: {record}",
-                        args=(),
-                        exc_info=None
-                    ))
-                loki_handler.handleError = handle_loki_error
+                # Prevent Loki errors from propagating and causing logging loops
+                loki_handler.handleError = lambda record: None
                 
                 # QueueListener processes logs asynchronously in background
                 queue_listener = QueueListener(log_queue, loki_handler, respect_handler_level=True)
                 queue_listener.start()
                 
-                # Store listener in root logger to prevent garbage collection
-                root_logger._loki_queue_listener = queue_listener
-                
                 # QueueHandler sends logs to queue without blocking
                 queue_handler = QueueHandler(log_queue)
-                queue_handler.setLevel(logging.DEBUG)  # Ensure handler accepts all log levels
                 root_logger.addHandler(queue_handler)
                 
-                root_logger.info(f"Grafana Loki async logging enabled: {loki_url}")
-                root_logger.info(f"Loki configured with tags: {loki_handler.tags}")
+                root_logger.info(f"Grafana Loki logging enabled: {loki_url} (tags: {loki_tags})")
             except Exception as e:
-                root_logger.warning(f"Failed to setup Grafana Loki logging: {e}", exc_info=True)
+                root_logger.warning(f"Failed to setup Grafana Loki logging: {e}")
         else:
             missing = []
             if not loki_url:
@@ -126,7 +110,8 @@ def setup_logger(name: str) -> logging.Logger:
                 missing.append("LOKI_USERNAME")
             if not loki_password:
                 missing.append("LOKI_PASSWORD")
-            root_logger.info(f"Loki logging disabled (missing: {', '.join(missing)})")
+            if missing:
+                root_logger.info(f"Loki logging disabled (missing: {', '.join(missing)})")
         
         root_logger.setLevel(log_level)
     
