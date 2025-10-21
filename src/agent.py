@@ -35,20 +35,29 @@ class AIMeAgent(BaseModel):
     def mcp_github_params(self) -> MCPServerParams:
         """GitHub MCP server params with token injected from instance.
         
-        Note: The GitHub MCP server CLI doesn't properly support --toolsets and --read-only
-        flags via npx, so we connect to all tools but filter at the agent level via the
-        tools passed to create_agent(). See the chat() method for how tools are filtered.
+        Uses the official GitHub MCP server binary maintained by GitHub.
+        Package: github/github-mcp-server
+        GitHub: https://github.com/github/github-mcp-server
+        
+        The official version supports --toolsets and --read-only flags.
+        We use read-only mode with a limited toolset for safety.
         """
+        import os
+        
+        # Use local binary for testing, production path in Docker
+        binary_path = "/tmp/test-github-mcp/github-mcp-server" if os.path.exists("/tmp/test-github-mcp/github-mcp-server") else "/app/bin/github-mcp-server"
+        
         return MCPServerParams(
-            command="npx",
+            command=binary_path,
             args=[
-                "-y",
-                "@github/github-mcp-server",
+                "stdio",
+                "--toolsets", "repos,issues,pull_requests,users",
+                "--read-only"
             ],
             env={
                 "GITHUB_PERSONAL_ACCESS_TOKEN": self.github_token.get_secret_value() if self.github_token else "",
             },
-            description="GitHub MCP Server (Official)"
+            description="GitHub MCP Server (Official Binary)"
         )
     
     @computed_field

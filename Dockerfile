@@ -14,6 +14,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# Download official GitHub MCP server binary
+RUN mkdir -p /app/bin \
+    && curl -L https://github.com/github/github-mcp-server/releases/download/v0.19.0/github-mcp-server_Linux_x86_64.tar.gz \
+    | tar -xz -C /app/bin \
+    && chmod +x /app/bin/github-mcp-server
+
 WORKDIR /app
 
 # Install project dependencies with uv
