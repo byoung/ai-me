@@ -11,6 +11,7 @@ This is a personal AI agent application that creates an agentic version of real 
 - Only break if the line is longer than 100 characters.
 - try to keep function calls on a single line if possible.
 - use the full 100 characters for comments and docstrings.
+- **Always place imports at the top of the file** (following PEP 8): standard library imports first, then third-party imports, then local imports, each group separated by a blank line. Never use inline imports inside functions.
 
 ### Testing
 

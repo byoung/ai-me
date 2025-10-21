@@ -4,7 +4,11 @@ Centralizes environment variables, API clients, and application defaults.
 """
 import os
 import logging
+import socket
 from typing import Optional, List, Union
+from logging.handlers import QueueHandler, QueueListener
+from queue import Queue
+
 from pydantic import Field, field_validator, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from openai import AsyncOpenAI
@@ -39,8 +43,6 @@ def setup_logger(name: str) -> logging.Logger:
     Returns:
         A configured logger instance
     """
-    import socket
-    
     # Configure root logger if not already configured
     root_logger = logging.getLogger()
     if not root_logger.handlers:
@@ -74,9 +76,6 @@ def setup_logger(name: str) -> logging.Logger:
         
         if loki_url and loki_username and loki_password:
             try:
-                from logging.handlers import QueueHandler, QueueListener
-                from queue import Queue
-                
                 # Create async queue for non-blocking logging
                 log_queue = Queue(maxsize=1000)  # Buffer up to 1000 log messages
                 
@@ -103,6 +102,7 @@ def setup_logger(name: str) -> logging.Logger:
                 root_logger.warning(f"Failed to setup Grafana Loki logging: {e}")
         
         root_logger.setLevel(log_level)
+        root_logger.info(f"Root logger configured: level={log_level_name}, handlers={len(root_logger.handlers)}")
     
     logger = logging.getLogger(name)
     return logger
