@@ -1,9 +1,10 @@
 /* Make the chatbot use full viewport height */
 .gradio-container {
     max-width: 100% !important;
-    min-height: 100vh !important;
+    height: 100vh !important;
     display: flex !important;
     flex-direction: column !important;
+    overflow: hidden !important;
 }
 
 /* Expand chat interface to fill container */
@@ -47,6 +48,11 @@
 .message-wrap code {
     color: inherit !important;
     opacity: 0.9 !important;
+}
+
+/* Hide Gradio footer */
+footer {
+    display: none !important;
 }
 
 /* Hide Gradio footer */

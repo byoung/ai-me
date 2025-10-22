@@ -7,23 +7,13 @@ function setupScrollHandler() {
             return;
         }
         
-        let lastScrollTime = 0;
-        const SCROLL_DELAY = 100; // Minimum ms between scroll attempts
-        
         // Create observer to watch for pending bubble
         const observer = new MutationObserver((mutations) => {
-            const now = Date.now();
-            
-            // Only process if enough time has passed since last scroll
-            if (now - lastScrollTime < SCROLL_DELAY) {
-                return;
-            }
-            
             // Look for pending bubble
             const pending = document.querySelector('.message.bot.pending.bubble');
             
             if (pending) {
-                lastScrollTime = now;
+                // Scroll to the pending message using instant scroll to avoid layout thrashing
                 pending.scrollIntoView({ 
                     behavior: 'instant', 
                     block: 'nearest'
@@ -31,7 +21,7 @@ function setupScrollHandler() {
             }
         });
         
-        // Start observing with subtree to catch nested messages
+        // Start observing
         observer.observe(chatbot, {
             childList: true,
             subtree: true
