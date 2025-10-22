@@ -26,8 +26,11 @@ jobs:
           -e GROQ_API_KEY="${GROQ_API_KEY}" \
           -e GH_PERSONAL_ACCESS_TOKEN="${GH_PERSONAL_ACCESS_TOKEN}" \
           -e TEMPERATURE=0 \
+          -e DOC_ROOT=/app/test_data \
+          -e LOCAL_DOCS="**/*.md" \
+          --entrypoint uv \
           ai-me:test \
-          uv run pytest src/test.py -v -s
+          run pytest src/test.py -v -s
 
   deploy:
     needs: test
