@@ -12,32 +12,22 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
+    - name: Build Docker image
+      run: docker build -t ai-me:test .
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v5
-      with:
-        enable-cache: true
-
-    - name: Install dependencies
-      run: uv sync --all-groups
-
-    - name: Debug environment variables
+    - name: Run tests in Docker container
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
       run: |
-        echo "OPENAI_API_KEY is set: $([ -n "$OPENAI_API_KEY" ] && echo 'yes' || echo 'no')"
-        echo "GROQ_API_KEY is set: $([ -n "$GROQ_API_KEY" ] && echo 'yes' || echo 'no')"
-
-    - name: Run tests
-      env:
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      run: uv run pytest src/test.py -v -s
+        docker run --rm \
+          -e OPENAI_API_KEY="${OPENAI_API_KEY}" \
+          -e GROQ_API_KEY="${GROQ_API_KEY}" \
+          -e GH_PERSONAL_ACCESS_TOKEN="${GH_PERSONAL_ACCESS_TOKEN}" \
+          -e TEMPERATURE=0 \
+          ai-me:test \
+          uv run pytest src/test.py -v -s
 
   deploy:
     needs: test
