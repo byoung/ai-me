@@ -88,7 +88,7 @@ if __name__ == "__main__":
         custom_js = f.read()
     
     with gradio.Blocks(
-        theme='SebastianBravo/simci_css',
+        theme=gradio.themes.Default(),
         css=custom_css,
         js=f"() => {{ {custom_js} }}"
     ) as ui:
@@ -107,7 +107,7 @@ if __name__ == "__main__":
                 chat, 
                 type="messages",
                 chatbot=gradio.Chatbot(
-                    height="50vh",
+                    height="65vh",
                     show_copy_button=False,
                     render_markdown=True,
                     autoscroll=False,  # Disable autoscroll to prevent jumping to bottom

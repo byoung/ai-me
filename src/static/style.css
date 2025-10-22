@@ -26,10 +26,30 @@
     max-width: 100% !important;
 }
 
-/* Better spacing for large responses */
+/* Better spacing for large responses - ensure strong contrast */
 .bot.message {
     padding: 12px !important;
     line-height: 1.6 !important;
 }
 
+/* Force text to be readable in both light and dark modes */
+.message {
+    color: inherit !important;
+}
 
+.message-wrap p,
+.message-wrap span,
+.message-wrap div {
+    color: inherit !important;
+}
+
+/* Ensure markdown text has good contrast */
+.message-wrap code {
+    color: inherit !important;
+    opacity: 0.9 !important;
+}
+
+/* Hide Gradio footer */
+footer {
+    display: none !important;
+}
