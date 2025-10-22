@@ -1,0 +1,28 @@
+/* Make the chatbot use full viewport height */
+.gradio-container {
+    max-width: 100% !important;
+    height: 100vh !important;
+}
+
+/* Expand chat interface to fill container */
+#component-0 {
+    height: calc(100vh - 20px) !important;
+}
+
+/* Make chatbot scrollable and fill available space */
+.chatbot {
+    height: calc(100vh - 250px) !important;
+    max-height: calc(100vh - 250px) !important;
+    overflow-y: auto !important;
+}
+
+/* Improve message readability */
+.message-wrap {
+    max-width: 100% !important;
+}
+
+/* Better spacing for large responses */
+.bot.message {
+    padding: 12px !important;
+    line-height: 1.6 !important;
+}

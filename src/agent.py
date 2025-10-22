@@ -2,15 +2,34 @@
 Agent configuration and MCP server setup.
 Handles agent-specific configuration like MCP servers and prompts.
 """
+import json
+from logging import config
+import traceback
 from typing import List, Dict, Any, Optional
+
 from pydantic import BaseModel, Field, computed_field, ConfigDict, SecretStr
 from agents import Agent, Tool, function_tool, Runner
 from agents.result import RunResult
 from agents.mcp import MCPServerStdio
 from config import setup_logger
-import traceback
  
 logger = setup_logger(__name__)
+
+# Unicode normalization translation table - built once, reused for all responses
+# Maps fancy Unicode characters to their ASCII equivalents for cleaner output
+UNICODE_NORMALIZE_TABLE = str.maketrans({
+    '\u202f': ' ',   # Narrow no-break space → regular space
+    '\u00a0': ' ',   # Non-breaking space → regular space
+    '\u2019': "'",   # Right single quotation mark → apostrophe
+    '\u2018': "'",   # Left single quotation mark → apostrophe
+    '\u201c': '"',   # Left double quotation mark → regular quote
+    '\u201d': '"',   # Right double quotation mark → regular quote
+    '\u2011': '-',   # Non-breaking hyphen → regular hyphen
+    '\u2013': '-',   # En dash → regular hyphen
+    '\u2014': '-',   # Em dash → regular hyphen
+    '】': ' ',       # Right white corner bracket
+    '【': ' ',       # Left white corner bracket
+})
 
 class MCPServerParams(BaseModel):
     """Type-safe MCP server parameters."""
@@ -27,6 +46,8 @@ class AIMeAgent(BaseModel):
     model: str
     vectorstore: Any = Field(default=None, exclude=True)
     github_token: Optional[SecretStr] = Field(default=None, exclude=True)
+    session_id: Optional[str] = Field(default=None, exclude=True)  # For logging context
+    _mcp_servers: List[Any] = []  # Store MCP servers for cleanup
     
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
@@ -51,7 +72,7 @@ class AIMeAgent(BaseModel):
             command=binary_path,
             args=[
                 "stdio",
-                "--toolsets", "repos,issues,pull_requests,users",
+                "--toolsets", "repos",
                 "--read-only"
             ],
             env={
@@ -103,11 +124,79 @@ class AIMeAgent(BaseModel):
     def agent_prompt(self) -> str:
         """Generate agent prompt template."""
         return f"""
-You are acting as somebody who personifying {self.bot_full_name} and must follow these rules:
- * If the user asks a question, use the get_local_info tool to gather more info
- * Answer based on the information given to you by the tool calls
- * do not offer follow up questions, just answer the question
- * Add reference links at the end of the output if they contain https://github.com
+You are acting as somebody who is personifying {self.bot_full_name}.
+Your primary role is to help users by answering questions about my knowledge, experience,
+and expertise in technology. When interacting the the user follow these rules:
+- always refer to yourself as {self.bot_full_name} or "I".
+- When talking about a prior current or prior employer indicate the relationship clearly. For example: Neosofia (my current employer) or Medidata (a prior employer).
+- You should be personable, friendly, and professional in your responses.
+- You should note information about the user in your memory to improve future interactions.
+- You should use the tools available to you to look up information as needed.
+- If the user asks a question ALWAYS USE THE get_local_info tool ONCE to gather info from my documentation (this is RAG-based)
+- Format file references as complete GitHub URLs with owner, repo, path, and filename
+  - Example: https://github.com/owner/repo/blob/main/filename.md
+  - Never use shorthand like: filename.md†L44-L53 or source†L44-L53
+  - Always strip out line number references
+- Add reference links in a references section at the end of the output if they match github.com
+- Below are critical instructions for using your memory and GitHub tools effectively.
+
+MEMORY USAGE - MANDATORY WORKFLOW FOR EVERY USER MESSAGE:
+1. FIRST ACTION - Read Current Memory:
+   - Call read_graph() to see ALL existing entities and their observations
+   - This prevents errors when adding observations to entities
+2. User Identification:
+   - Assume you are interacting with a user entity (e.g., "user_john" if they say "I'm John")
+   - If the user entity doesn't exist in the graph yet, you MUST create it first
+3. Gather New Information:
+   - Pay attention to new information about the user:
+     a) Basic Identity (name, age, gender, location, job title, education, etc.)
+     b) Behaviors (interests, habits, activities, etc.)
+     c) Preferences (communication style, preferred language, topics of interest, etc.)
+     d) Goals (aspirations, targets, objectives, etc.)
+     e) Relationships (personal and professional connections)
+4. Update Memory - CRITICAL ORDER:
+   - STEP 1: Create missing entities using create_entities() for any new people, organizations, or events
+   - STEP 2: ONLY AFTER entities exist, add facts using add_observations() to existing entities
+   - STEP 3: Connect related entities using create_relations()   
+EXAMPLE - User says "Hi, I'm Alice":
+✓ Correct order:
+  1. read_graph() - check if user_alice exists
+  2. create_entities(entities=[{{"name": "user_alice", "entityType": "person", "observations": ["Name is Alice"]}}])
+  3. respond to user
+✗ WRONG - will cause errors:
+  1. add_observations(entityName="user_alice", observations=["Name is Alice"]) - ERROR: entity not found!
+ALWAYS create entities BEFORE adding observations to them.
+
+GITHUB TOOLS RESTRICTIONS - IMPORTANT:
+DO NOT USE ANY GITHUB TOOL MORE THAN THREE TIMES PER SESSION.
+You have access to these GitHub tools ONLY:
+- search_code: to look for code snippets and references supporting your answers
+- get_file_contents: for getting source code (NEVER download .md markdown files)
+- list_commits: for getting commit history for a specific user
+CRITICAL RULES FOR search_code TOOL:
+The search_code tool searches ALL of GitHub by default. You MUST add owner/repo filters to EVERY search_code query.
+REQUIRED FORMAT: Always include one of these filters in the query parameter:
+- user:byoung (to search byoung's repos)
+- org:Neosofia (to search Neosofia's repos)  
+- repo:byoung/ai-me (specific repo)
+- repo:Neosofia/corporate (specific repo)
+EXAMPLES OF CORRECT search_code USAGE:
+- search_code(query="python user:byoung")
+- search_code(query="docker org:Neosofia")
+- search_code(query="ReaR repo:Neosofia/corporate")
+EXAMPLES OF INCORRECT search_code USAGE (NEVER DO THIS):
+- search_code(query="python")
+- search_code(query="ReaR")
+- search_code(query="bash script")
+CRITICAL RULES FOR get_file_contents TOOL:
+The get_file_contents tool accepts ONLY these parameters: owner, repo, path
+DO NOT use 'ref' parameter - it will cause errors. The tool always reads from the main/default branch.
+EXAMPLES OF CORRECT get_file_contents USAGE:
+- get_file_contents(owner="Neosofia", repo="corporate", path="website/qms/policies.md")
+- get_file_contents(owner="byoung", repo="ai-me", path="README.md")
+EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
+- get_file_contents(owner="Neosofia", repo="corporate", path="website/qms/policies.md", ref="main")
+- get_file_contents(owner="byoung", repo="ai-me", path="README.md", ref="master") 
 """
     
     async def setup_mcp_servers(self, mcp_params_list: List[MCPServerParams]):
@@ -187,6 +276,10 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
         """
         # Setup MCP servers if any params provided
         mcp_servers = await self.setup_mcp_servers(mcp_params) if mcp_params else None
+        
+        # Store MCP servers for cleanup
+        if mcp_servers:
+            self._mcp_servers = mcp_servers
 
         # Use provided prompt or fall back to default
         prompt = agent_prompt if agent_prompt is not None else self.agent_prompt
@@ -231,15 +324,21 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
 
     async def run(self, user_input: str, **runner_kwargs) -> str:
         """Run the agent and post-process output to remove Unicode brackets."""
+        # Log user input with session context
+        session_prefix = f"[Session: {self.session_id[:8]}...] " if self.session_id else ""
+        json_input = {"session_id": self.session_id, "user_input": user_input}
+        logger.info(json.dumps(json_input))
+        
         try:
             result: RunResult = await Runner.run(self._agent, user_input, **runner_kwargs)
         except Exception as e:
             error_str = str(e).lower()
             
             if "rate limit" in error_str or "api rate limit exceeded" in error_str:
+                logger.warning(f"{session_prefix}GitHub rate limit exceeded")
                 return "⚠️ GitHub rate limit exceeded. Try asking me again in 30 seconds"
             else:
-                logger.error("Unexpected error: %s", error_str)
+                logger.error(f"{session_prefix}Unexpected error: %s", error_str)
                 return """⚠️ I encountered an unexpected error. 
                 My flesh and blood counterpart has been notified. 
                 You can try asking me a new question or waiting a moment.
@@ -247,7 +346,30 @@ You are acting as somebody who personifying {self.bot_full_name} and must follow
                 Maybe I should be called 🐛 🤖
                 """
 
-
-        cleaned_output = result.final_output.replace("】", " ").replace("【", " ")
+        # Normalize Unicode characters to ASCII equivalents in a single pass
+        cleaned_output = result.final_output.translate(UNICODE_NORMALIZE_TABLE)
+        
+        # Log agent output with session context
+        json_output = {"session_id": self.session_id, "agent_output": cleaned_output}
+        logger.info(json.dumps(json_output))
+        
         return cleaned_output
+    
+    async def cleanup(self):
+        """Cleanup MCP servers to prevent shutdown errors."""
+        if not self._mcp_servers:
+            return
+        
+        session_prefix = f"[Session: {self.session_id[:8]}...] " if self.session_id else ""
+        logger.debug(f"{session_prefix}Cleaning up {len(self._mcp_servers)} MCP servers...")
+        
+        for server in self._mcp_servers:
+            try:
+                await server.cleanup()
+            except Exception as e:
+                # Log but don't fail - best effort cleanup
+                logger.debug(f"{session_prefix}Error cleaning up MCP server: {e}")
+        
+        self._mcp_servers = []
+        logger.debug(f"{session_prefix}MCP servers cleaned up")
 
