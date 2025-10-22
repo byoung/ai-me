@@ -107,7 +107,6 @@ if __name__ == "__main__":
                 chat, 
                 type="messages",
                 chatbot=gradio.Chatbot(
-                    height="65vh",
                     show_copy_button=False,
                     render_markdown=True,
                     autoscroll=False,  # Disable autoscroll to prevent jumping to bottom
