@@ -90,6 +90,7 @@ if __name__ == "__main__":
     with gradio.Blocks(
         theme=gradio.themes.Default(),
         css=custom_css,
+        fill_height=True,
         js=f"() => {{ {custom_js} }}"
     ) as ui:
         with gradio.Column(elem_id="main-column"):
@@ -106,6 +107,7 @@ if __name__ == "__main__":
             gradio.ChatInterface(
                 chat, 
                 type="messages",
+                fill_height=True,
                 chatbot=gradio.Chatbot(
                     show_copy_button=False,
                     render_markdown=True,
