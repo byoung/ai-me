@@ -57,7 +57,7 @@ docker compose build notebooks
 # Create .env with required keys:
 OPENAI_API_KEY=<for tracing>
 GROQ_API_KEY=<primary LLM provider>
-GH_PERSONAL_ACCESS_TOKEN=<for searching GitHub repos>
+GITHUB_PERSONAL_ACCESS_TOKEN=<for searching GitHub repos>
 BOT_FULL_NAME=<full name of the persona>
 APP_NAME=<name that appears on HF chat page>
 GITHUB_REPOS=<comma-separated list of public repos: owner/repo,owner/repo>
@@ -105,7 +105,7 @@ And Hugging Face needs to have these keys set:
 # PRIVATE!!!
 GROQ_API_KEY
 OPENAI_API_KEY
-GH_PERSONAL_ACCESS_TOKEN
+GITHUB_PERSONAL_ACCESS_TOKEN
 
 # Optional: Grafana Cloud Loki (Remote Logging)
 LOKI_URL

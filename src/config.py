@@ -131,7 +131,6 @@ class Config(BaseSettings):
         description="Groq API key for inference")
     github_token: Optional[SecretStr] = Field(
         default=None,
-        alias="GH_PERSONAL_ACCESS_TOKEN",
         description="GitHub PAT for MCP servers (optional, not needed for testing)")
 
     bot_full_name: str = Field(

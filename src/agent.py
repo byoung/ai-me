@@ -76,7 +76,7 @@ class AIMeAgent(BaseModel):
                 "--read-only"
             ],
             env={
-                "GH_PERSONAL_ACCESS_TOKEN": self.github_token.get_secret_value() if self.github_token else "",
+                "GITHUB_PERSONAL_ACCESS_TOKEN": self.github_token.get_secret_value() if self.github_token else "",
             },
             description="GitHub MCP Server (Official Binary)"
         )
