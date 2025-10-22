@@ -13,15 +13,16 @@ function setupScrollHandler() {
             const pending = document.querySelector('.message.bot.pending.bubble');
             
             if (pending) {
+                // Scroll to the pending message using instant scroll to avoid layout thrashing
                 pending.scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'end'
+                    behavior: 'instant', 
+                    block: 'nearest'
                 });
             }
         });
         
         // Start observing
-        observer.observe(document.body, {
+        observer.observe(chatbot, {
             childList: true,
             subtree: true
         });

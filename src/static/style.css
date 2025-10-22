@@ -1,19 +1,24 @@
 /* Make the chatbot use full viewport height */
 .gradio-container {
     max-width: 100% !important;
-    height: 100vh !important;
+    min-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 /* Expand chat interface to fill container */
 #component-0 {
-    height: calc(100vh - 20px) !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
 }
 
 /* Make chatbot scrollable and fill available space */
 .chatbot {
-    height: calc(100vh - 250px) !important;
-    max-height: calc(100vh - 250px) !important;
+    flex: 1 !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
 }
 
 /* Improve message readability */
@@ -26,3 +31,5 @@
     padding: 12px !important;
     line-height: 1.6 !important;
 }
+
+
