@@ -16,7 +16,7 @@ The test suite (`src/test.py`) validates the ai-me agent system including:
    ```bash
    OPENAI_API_KEY=<your-openai-key>     # For tracing
    GROQ_API_KEY=<your-groq-key>         # For LLM inference
-   GITHUB_PERSONAL_ACCESS_TOKEN=<token> # For GitHub integration (optional for tests)
+   GH_PERSONAL_ACCESS_TOKEN=<token> # For GitHub integration (optional for tests)
    ```
 
 2. Install dependencies:
