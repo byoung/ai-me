@@ -30,8 +30,8 @@ class DataManagerConfig(BaseModel):
     github_repos: List[str] = Field(
         default=[], description="List of GitHub repos (format: owner/repo)")
     doc_root: str = Field(
-        default=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docs")) + "/",
-        description="Root directory for local documents")
+        default=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docs", "local-testing")) + "/",
+        description="Root directory for local documents (development/testing only)")
     chunk_size: int = Field(
         default=2500, description="Character chunk size for splitting")
     chunk_overlap: int = Field(

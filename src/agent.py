@@ -148,6 +148,12 @@ these rules:
   - Example: https://github.com/owner/repo/blob/main/filename.md
   - Never use shorthand like: filename.md†L44-L53 or source†L44-L53
   - Always strip out line number references
+- CRITICAL: Include source citations in your response to establish credibility
+  and traceability. Format citations as:
+  - For GitHub sources: "Per my [document_name]..." or "As mentioned in [document_name]..."
+  - For local sources: "According to my documentation on [topic]..."
+  - Include the source URL in parentheses when available
+  - Example: "Per my resume (https://github.com/byoung/ai-me/blob/main/resume.md), I worked at..."
 - Add reference links in a references section at the end of the output if they
   match github.com
 - Below are critical instructions for using your memory and GitHub tools

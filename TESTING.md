@@ -55,6 +55,43 @@ uv run pytest src/test.py::test_rear_knowledge_contains_it245 -v
 
 The temperature of 0 ensures that the agent's responses are consistent across test runs, making assertions more reliable.
 
+## Session Isolation Testing (Manual)
+
+**Note on Concurrency Testing**: Rather than implement brittle pytest-based concurrency tests, session isolation (SC-006) is verified through **manual browser-based testing**:
+
+### Steps to Manually Test Session Isolation
+
+1. **Start the app**:
+   ```bash
+   uv run src/app.py
+   ```
+
+2. **Open multiple browser tabs** (or separate browsers):
+   - Tab A: http://localhost:7860
+   - Tab B: http://localhost:7860
+   - Tab C: http://localhost:7860
+
+3. **Test scenario**: Interleave conversations across tabs
+   - Tab A: "Hi, My name is Slartibartfast."
+   - Tab B: "Hi, how are you?"
+   - Tab A: "what is my name?"
+   - Tab B: "what is my name?"
+
+4. **Verify**:
+   - ✅ Each tab maintains independent conversation history
+   - ✅ No information leaks between tabs -- tab B should say I don't know your name.
+   - ✅ Memory tool doesn't share state (different users in Memory graphs)
+   - ✅ Each session gets unique `session_id` in logs (check `uv run src/app.py` output)
+
+### Why Manual Testing?
+
+Integration tests for concurrent browser sessions are:
+- **Brittle**: Timing-dependent, fail randomly due to race conditions
+- **Slow**: Multiple concurrent LLM calls slow down test execution
+- **Fragile**: Heavy on resources, fail in CI/CD environments
+- **Hard to debug**: Concurrent failures are difficult to reproduce and fix
+
+
 ## Future Enhancements
 - [ ] Add tests for error handling and edge cases
 - [ ] Add performance benchmarks
