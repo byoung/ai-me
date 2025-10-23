@@ -36,15 +36,14 @@ async def initialize_session(session_id: str) -> None:
         session_id=session_id  # Pass session_id for logging context
     )
     
-    # TBD: make this prompt more generic by removing byoung/Neosofia specific references
-    # The instructions are a little too verbose because the search_code tool is a PITA...
+    # TBD: make this prompt more generic by removing byoung/Neosofia specific
+    # references. The instructions are verbose because search_code tool is complex.
     await session_agent.create_ai_me_agent(
         mcp_params=[
             session_agent.mcp_github_params,
             session_agent.mcp_time_params,
-            session_agent.get_mcp_memory_params(session_id)  # Session-specific memory
+            session_agent.get_mcp_memory_params(session_id),
         ],
-
     )
     
     # Store the session-specific agent
@@ -94,26 +93,26 @@ if __name__ == "__main__":
         js=f"() => {{ {custom_js} }}"
     ) as ui:
         with gradio.Column(elem_id="main-column"):
-            gradio.Markdown(f"""
-                            # Welcome to {config.app_name}
-                            The digital version of {config.bot_full_name} AKA the digital assistant 
-                            that you never knew you needed ;) Feel free to ask me anything about my 
-                            experience, skills, projects, and interests.
-                            """)
-            
+            gradio.Markdown(
+                f"# Welcome to {config.app_name}\n"
+                f"The digital version of {config.bot_full_name} AKA the digital "
+                f"assistant that you never knew you needed ;) Feel free to ask me "
+                f"anything about my experience, skills, projects, and interests."
+            )
+
             # Hidden component to trigger session initialization on page load
             session_init = gradio.Textbox(visible=False)
             
             gradio.ChatInterface(
-                chat, 
+                chat,
                 type="messages",
                 fill_height=True,
                 chatbot=gradio.Chatbot(
                     show_copy_button=False,
                     render_markdown=True,
-                    autoscroll=False,  # Disable autoscroll to prevent jumping to bottom
-                    elem_id="main-chatbot"
-                )
+                    autoscroll=False,  # Disable autoscroll - prevents jumping to bottom
+                    elem_id="main-chatbot",
+                ),
             )
             
             # Initialize session when page loads

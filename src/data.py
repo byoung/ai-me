@@ -84,7 +84,10 @@ class DataManager:
         
         # Check if directory exists first
         if not os.path.exists(self.config.doc_root):
-            logger.info(f"Warning: Directory not found: {self.config.doc_root} - skipping local documents")
+            logger.info(
+                f"Warning: Directory not found: {self.config.doc_root} - "
+                f"skipping local documents"
+            )
             return []
         
         all_documents = []
@@ -189,7 +192,8 @@ class DataManager:
             # Fix baseless links to point to GitHub (if from a GitHub repo)
             if "github_repo" in doc.metadata:
                 repo = doc.metadata["github_repo"]
-                # First pass: fix absolute paths like /website/ or /docs/ typically used in short links
+                # First pass: fix absolute paths like /website/ or /docs/
+                # typically used in short links
                 doc.page_content = re.sub(r'(\s|^)(/[a-zA-Z0-9_-]+/)',
                     rf'\1https://github.com/{repo}/tree/main\2', doc.page_content)
                 # Second pass: fix inline markdown links like [text](/path/file.md)
@@ -226,9 +230,10 @@ class DataManager:
             # Convert to Documents and preserve original metadata + add header metadata
             for chunk in header_chunks:
                 # Create new Document with combined metadata
+                merged_metadata = {**doc.metadata, **chunk.metadata}
                 new_doc = Document(
                     page_content=chunk.page_content,
-                    metadata={**doc.metadata, **chunk.metadata}  # Merge original + header metadata
+                    metadata=merged_metadata,
                 )
                 all_chunks.append(new_doc)
         
@@ -241,12 +246,14 @@ class DataManager:
     
     def load_and_process_all(self, github_repos: List[str] = None) -> List[Document]:
         """
-        Load, process, and chunk all documents. Automatically loads local documents if 
-        doc_load_local is set, and GitHub documents if github_repos (or self.config.github_repos) is set.
-        
+        Load, process, and chunk all documents. Automatically loads local documents
+        if doc_load_local is set, and GitHub documents if github_repos (or
+        self.config.github_repos) is set.
+
         Args:
-            github_repos: Optional list of specific repos to load. Uses self.config.github_repos if None.
-        
+            github_repos: Optional list of specific repos to load. Uses
+                self.config.github_repos if None.
+
         Returns:
             List of processed and chunked documents.
         """
@@ -316,15 +323,19 @@ class DataManager:
         self._vectorstore = vectorstore
         return vectorstore
     
-    def setup_vectorstore(self, github_repos: List[str] = None, reset: bool = True) -> Chroma:
+    def setup_vectorstore(
+        self, github_repos: List[str] = None, reset: bool = True
+    ) -> Chroma:
         """
-        Complete pipeline: load, process, chunk, and create vectorstore. Automatically loads local
-        documents if doc_load_local is set, and GitHub documents if github_repos is specified.
-        
+        Complete pipeline: load, process, chunk, and create vectorstore. Automatically
+        loads local documents if doc_load_local is set, and GitHub documents if
+        github_repos is specified.
+
         Args:
-            github_repos: Optional list of specific repos to load. Uses self.config.github_repos if None.
+            github_repos: Optional list of specific repos to load. Uses
+                self.config.github_repos if None.
             reset: If True, drop existing collection before creating.
-        
+
         Returns:
             Chroma vectorstore instance ready for queries.
         """

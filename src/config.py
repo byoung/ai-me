@@ -8,7 +8,6 @@ import socket
 from typing import Optional, List, Union
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
-from base64 import b64encode
 
 from pydantic import Field, field_validator, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -81,7 +80,10 @@ def setup_logger(name: str) -> logging.Logger:
                 log_queue = Queue(maxsize=1000)  # Buffer up to 1000 log messages
                 
                 # Loki handler processes logs from queue in background thread
-                loki_tags = {"application": "ai-me", "environment": os.getenv('ENV', 'production')}
+                loki_tags = {
+                    "application": "ai-me",
+                    "environment": os.getenv('ENV', 'production'),
+                }
                 loki_handler = LokiHandler(
                     url=f"{loki_url}/loki/api/v1/push",
                     tags=loki_tags,
@@ -92,7 +94,11 @@ def setup_logger(name: str) -> logging.Logger:
                 loki_handler.handleError = lambda record: None
                 
                 # QueueListener processes logs asynchronously in background
-                queue_listener = QueueListener(log_queue, loki_handler, respect_handler_level=True)
+                queue_listener = QueueListener(
+                    log_queue,
+                    loki_handler,
+                    respect_handler_level=True,
+                )
                 queue_listener.start()
                 
                 # QueueHandler sends logs to queue without blocking

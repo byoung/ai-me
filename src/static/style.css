@@ -6,10 +6,11 @@
 
 #main-chatbot {
     flex: 1 1 0 !important;
-    min-height: 0 !important;
+    min-height: 250px !important;
     overflow-y: auto !important;
 }
 
 footer {
-    visibility: hidden
+    visibility: hidden;
+    height: 0px;
 }

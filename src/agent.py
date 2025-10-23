@@ -3,7 +3,6 @@ Agent configuration and MCP server setup.
 Handles agent-specific configuration like MCP servers and prompts.
 """
 import json
-from logging import config
 import traceback
 from typing import List, Dict, Any, Optional
 
@@ -64,10 +63,13 @@ class AIMeAgent(BaseModel):
         We use read-only mode with a limited toolset for safety.
         """
         import os
-        
+
         # Use local binary for testing, production path in Docker
-        binary_path = "/tmp/test-github-mcp/github-mcp-server" if os.path.exists("/tmp/test-github-mcp/github-mcp-server") else "/app/bin/github-mcp-server"
-        
+        test_binary = "/tmp/test-github-mcp/github-mcp-server"
+        prod_binary = "/app/bin/github-mcp-server"
+        binary_path = (
+            test_binary if os.path.exists(test_binary) else prod_binary
+        )
         return MCPServerParams(
             command=binary_path,
             args=[
@@ -76,7 +78,10 @@ class AIMeAgent(BaseModel):
                 "--read-only"
             ],
             env={
-                "GITHUB_PERSONAL_ACCESS_TOKEN": self.github_token.get_secret_value() if self.github_token else "",
+                "GITHUB_PERSONAL_ACCESS_TOKEN": (
+                    self.github_token.get_secret_value()
+                    if self.github_token else ""
+                ),
             },
             description="GitHub MCP Server (Official Binary)"
         )
@@ -125,59 +130,76 @@ class AIMeAgent(BaseModel):
         """Generate agent prompt template."""
         return f"""
 You are acting as somebody who is personifying {self.bot_full_name}.
-Your primary role is to help users by answering questions about my knowledge, experience,
-and expertise in technology. When interacting the the user follow these rules:
+Your primary role is to help users by answering questions about my knowledge,
+experience, and expertise in technology. When interacting with the user follow
+these rules:
 - always refer to yourself as {self.bot_full_name} or "I".
-- When talking about a prior current or prior employer indicate the relationship clearly. For example: Neosofia (my current employer) or Medidata (a prior employer).
+- When talking about a prior current or prior employer indicate the relationship
+  clearly. For example: Neosofia (my current employer) or Medidata (a prior
+  employer).
 - You should be personable, friendly, and professional in your responses.
-- You should note information about the user in your memory to improve future interactions.
+- You should note information about the user in your memory to improve future
+  interactions.
 - You should use the tools available to you to look up information as needed.
-- If the user asks a question ALWAYS USE THE get_local_info tool ONCE to gather info from my documentation (this is RAG-based)
-- Format file references as complete GitHub URLs with owner, repo, path, and filename
+- If the user asks a question ALWAYS USE THE get_local_info tool ONCE to gather
+  info from my documentation (this is RAG-based)
+- Format file references as complete GitHub URLs with owner, repo, path, and
+  filename
   - Example: https://github.com/owner/repo/blob/main/filename.md
   - Never use shorthand like: filename.md†L44-L53 or source†L44-L53
   - Always strip out line number references
-- Add reference links in a references section at the end of the output if they match github.com
-- Below are critical instructions for using your memory and GitHub tools effectively.
+- Add reference links in a references section at the end of the output if they
+  match github.com
+- Below are critical instructions for using your memory and GitHub tools
+  effectively.
 
 MEMORY USAGE - MANDATORY WORKFLOW FOR EVERY USER MESSAGE:
 1. FIRST ACTION - Read Current Memory:
    - Call read_graph() to see ALL existing entities and their observations
    - This prevents errors when adding observations to entities
 2. User Identification:
-   - Assume you are interacting with a user entity (e.g., "user_john" if they say "I'm John")
+   - Assume you are interacting with a user entity (e.g., "user_john" if they
+     say "I'm John")
    - If the user entity doesn't exist in the graph yet, you MUST create it first
 3. Gather New Information:
    - Pay attention to new information about the user:
      a) Basic Identity (name, age, gender, location, job title, education, etc.)
      b) Behaviors (interests, habits, activities, etc.)
-     c) Preferences (communication style, preferred language, topics of interest, etc.)
+     c) Preferences (communication style, preferred language, topics of
+        interest, etc.)
      d) Goals (aspirations, targets, objectives, etc.)
      e) Relationships (personal and professional connections)
 4. Update Memory - CRITICAL ORDER:
-   - STEP 1: Create missing entities using create_entities() for any new people, organizations, or events
-   - STEP 2: ONLY AFTER entities exist, add facts using add_observations() to existing entities
-   - STEP 3: Connect related entities using create_relations()   
+   - STEP 1: Create missing entities using create_entities() for any new
+     people, organizations, or events
+   - STEP 2: ONLY AFTER entities exist, add facts using add_observations() to
+     existing entities
+   - STEP 3: Connect related entities using create_relations()
 EXAMPLE - User says "Hi, I'm Alice":
 ✓ Correct order:
   1. read_graph() - check if user_alice exists
-  2. create_entities(entities=[{{"name": "user_alice", "entityType": "person", "observations": ["Name is Alice"]}}])
+  2. create_entities(entities=[{{"name": "user_alice", "entityType": "person",
+     "observations": ["Name is Alice"]}}])
   3. respond to user
 ✗ WRONG - will cause errors:
-  1. add_observations(entityName="user_alice", observations=["Name is Alice"]) - ERROR: entity not found!
+  1. add_observations(entityName="user_alice",
+     observations=["Name is Alice"]) - ERROR: entity not found!
 ALWAYS create entities BEFORE adding observations to them.
 
 GITHUB TOOLS RESTRICTIONS - IMPORTANT:
 DO NOT USE ANY GITHUB TOOL MORE THAN THREE TIMES PER SESSION.
 You have access to these GitHub tools ONLY:
-- search_code: to look for code snippets and references supporting your answers
-- get_file_contents: for getting source code (NEVER download .md markdown files)
+- search_code: to look for code snippets and references supporting your
+  answers
+- get_file_contents: for getting source code (NEVER download .md markdown
+  files)
 - list_commits: for getting commit history for a specific user
 CRITICAL RULES FOR search_code TOOL:
-The search_code tool searches ALL of GitHub by default. You MUST add owner/repo filters to EVERY search_code query.
+The search_code tool searches ALL of GitHub by default. You MUST add
+owner/repo filters to EVERY search_code query.
 REQUIRED FORMAT: Always include one of these filters in the query parameter:
 - user:byoung (to search byoung's repos)
-- org:Neosofia (to search Neosofia's repos)  
+- org:Neosofia (to search Neosofia's repos)
 - repo:byoung/ai-me (specific repo)
 - repo:Neosofia/corporate (specific repo)
 EXAMPLES OF CORRECT search_code USAGE:
@@ -190,13 +212,17 @@ EXAMPLES OF INCORRECT search_code USAGE (NEVER DO THIS):
 - search_code(query="bash script")
 CRITICAL RULES FOR get_file_contents TOOL:
 The get_file_contents tool accepts ONLY these parameters: owner, repo, path
-DO NOT use 'ref' parameter - it will cause errors. The tool always reads from the main/default branch.
+DO NOT use 'ref' parameter - it will cause errors. The tool always reads from
+the main/default branch.
 EXAMPLES OF CORRECT get_file_contents USAGE:
-- get_file_contents(owner="Neosofia", repo="corporate", path="website/qms/policies.md")
+- get_file_contents(owner="Neosofia", repo="corporate",
+  path="website/qms/policies.md")
 - get_file_contents(owner="byoung", repo="ai-me", path="README.md")
 EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
-- get_file_contents(owner="Neosofia", repo="corporate", path="website/qms/policies.md", ref="main")
-- get_file_contents(owner="byoung", repo="ai-me", path="README.md", ref="master") 
+- get_file_contents(owner="Neosofia", repo="corporate",
+  path="website/qms/policies.md", ref="main")
+- get_file_contents(owner="byoung", repo="ai-me", path="README.md",
+  ref="master")
 """
     
     async def setup_mcp_servers(self, mcp_params_list: List[MCPServerParams]):
@@ -224,7 +250,9 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
                 logger.error(f"  Traceback:\n{traceback.format_exc()}")
                 continue
 
-        logger.info(f"MCP Server Summary: {len(mcp_servers_local)}/{len(mcp_params_list)} connected")
+        mcp_count = len(mcp_servers_local)
+        mcp_total = len(mcp_params_list)
+        logger.info(f"MCP Server Summary: {mcp_count}/{mcp_total} connected")
         return mcp_servers_local
     
     def get_local_info_tool(self):
@@ -243,11 +271,18 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
                 # Handle both GitHub and local documents
                 if 'github_repo' in doc.metadata:
                     github_repo = doc.metadata['github_repo']
-                    file_path = doc.metadata.get('file_path', doc.metadata.get('source', 'unknown'))
-                    source_link = f"https://github.com/{github_repo}/tree/main/{file_path}\n"
+                    file_path = doc.metadata.get(
+                        'file_path',
+                        doc.metadata.get('source', 'unknown'),
+                    )
+                    source_link = (
+                        f"https://github.com/{github_repo}/tree/main/"
+                        f"{file_path}\n"
+                    )
                 else:
                     # Local document - use source path
-                    source_link = f"Source: {doc.metadata.get('source', 'local document')}\n"
+                    source = doc.metadata.get('source', 'local document')
+                    source_link = f"Source: {source}\n"
 
                 logger.info({ "filename": doc.metadata.get('source', 'unknown'), "score": score })
                 logger.debug(f"{doc.page_content[:100]}")
@@ -258,19 +293,23 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
         
         return get_local_info
     
-    # TBD: Make the tools and mcp_servers more extensible/configurable 
-    async def create_ai_me_agent(self, agent_prompt: str = None,
+    async def create_ai_me_agent(
+        self,
+        agent_prompt: str = None,
         mcp_params: Optional[List[MCPServerParams]] = None,
-        additional_tools: Optional[List[Tool]] = None) -> Agent:
+        additional_tools: Optional[List[Tool]] = None,
+    ) -> Agent:
         """Create the main ai-me agent.
-        
+
         Args:
-            agent_prompt: Optional agent prompt to override default. If None, uses self.agent_prompt.
-            mcp_params: Optional list of MCP server parameters to initialize. If None, no MCP servers
-                will be initialized. To use memory functionality, caller must explicitly pass
-                mcp_params including get_mcp_memory_params(session_id) with a unique session_id.
-            additional_tools: Optional list of additional tools to append to the default get_local_info tool.
-                The get_local_info tool is always included as the first tool.
+            agent_prompt: Optional prompt override. If None, uses self.agent_prompt.
+            mcp_params: Optional list of MCP server parameters to initialize.
+                If None, no MCP servers will be initialized. To use memory
+                functionality, caller must explicitly pass mcp_params including
+                get_mcp_memory_params(session_id) with a unique session_id.
+            additional_tools: Optional list of additional tools to append to
+                the default get_local_info tool. The get_local_info tool is
+                always included as the first tool.
         Returns:
             An initialized Agent instance.
         """
@@ -309,8 +348,12 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
         ai_me = Agent(**agent_kwargs)
 
         # Print all available tools after agent initialization
-        tool_names = [tool.name if hasattr(tool, 'name') else str(tool) for tool in (ai_me.tools or [])]
-        logger.info(f"Available tools (direct): {', '.join(tool_names) if tool_names else 'none'}")
+        tool_names = [
+            tool.name if hasattr(tool, "name") else str(tool)
+            for tool in (ai_me.tools or [])
+        ]
+        tools_str = ', '.join(tool_names) if tool_names else 'none'
+        logger.info(f"Available tools (direct): {tools_str}")
         
         # MCP tools are not in ai_me.tools - they're accessible via mcp_servers
         if mcp_servers:

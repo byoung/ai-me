@@ -165,19 +165,29 @@ async def test_mcp_time_server_returns_current_date(ai_me_agent):
     """Test 5: Verify that the MCP time server returns the current date."""
     
     response = await ai_me_agent.run("What is today's date?")
-    
+
     # Check for current date in various formats (ISO or natural language)
     now = datetime.now()
     expected_date, current_year, current_month, current_day = (
-        now.strftime("%Y-%m-%d"), str(now.year), now.strftime("%B"), str(now.day)
+        now.strftime("%Y-%m-%d"),
+        str(now.year),
+        now.strftime("%B"),
+        str(now.day),
     )
-    
+
     # Accept either ISO format or natural language date
-    has_date = (expected_date in response or 
-                (current_year in response and current_month in response and current_day in response))
-    
+    has_date = (
+        expected_date in response
+        or (
+            current_year in response
+            and current_month in response
+            and current_day in response
+        )
+    )
+
     assert has_date, (
-        f"Expected response to contain current date ({expected_date} or {current_month} {current_day}, {current_year}) "
+        f"Expected response to contain current date "
+        f"({expected_date} or {current_month} {current_day}, {current_year}) "
         f"but got: {response}"
     )
     logger.info(f"✓ Test passed: Response contains current date")
@@ -192,9 +202,14 @@ async def test_mcp_memory_server_remembers_favorite_color(ai_me_agent):
     
     # Check that the agent remembers the color
     assert "chartreuse" in response2.lower(), (
-        f"Expected agent to remember favorite color 'chartreuse' but got: {response2}"
+        f"Expected agent to remember favorite color 'chartreuse' "
+        f"but got: {response2}"
     )
-    logger.info("✓ Test passed: Agent remembered favorite color 'chartreuse' across interactions")
+    msg = (
+        "✓ Test passed: Agent remembered favorite color 'chartreuse' "
+        "across interactions"
+    )
+    logger.info(msg)
 
 
 if __name__ == "__main__":
