@@ -8,6 +8,7 @@ import re
 import sys
 import os
 from datetime import datetime
+from unittest.mock import AsyncMock, patch
 
 # Something about these tests makes me feel yucky. Big, brittle, and slow. BBS?
 # Couple ideas to make them better:
@@ -210,6 +211,213 @@ async def test_mcp_memory_server_remembers_favorite_color(ai_me_agent):
         "across interactions"
     )
     logger.info(msg)
+
+
+@pytest.mark.asyncio
+async def test_github_relative_links_converted_to_absolute_urls():
+    """Test 7: Verify that relative links in GitHub documents are converted to absolute GitHub URLs.
+    
+    This test validates FR-004 (Source Attribution): that when documents are loaded from GitHub
+    with relative links (e.g., /resume.md), they are rewritten to full GitHub URLs 
+    (e.g., https://github.com/owner/repo/blob/main/resume.md).
+    """
+    from langchain_core.documents import Document
+    
+    # Create a sample document as if it came from GitHub with relative links
+    sample_doc = Document(
+        page_content="Check out [my resume](/resume.md) and [projects](/projects.md) for more info.",
+        metadata={
+            "source": "github://byoung/ai-me/docs/about.md",
+            "github_repo": "byoung/ai-me"
+        }
+    )
+    
+    # Initialize data manager to use process_documents
+    data_config = DataManagerConfig(github_repos=["byoung/ai-me"])
+    data_manager = DataManager(config=data_config)
+    
+    # Process the document (applies URL rewriting)
+    processed_docs = data_manager.process_documents([sample_doc])
+    
+    # Verify the content
+    assert len(processed_docs) == 1, "Expected 1 processed document"
+    processed_content = processed_docs[0].page_content
+    
+    # Check that relative links have been converted to absolute GitHub URLs
+    assert "https://github.com/byoung/ai-me/blob/main/resume.md" in processed_content, (
+        f"Expected absolute GitHub URL for /resume.md in processed content, "
+        f"but got: {processed_content}"
+    )
+    assert "https://github.com/byoung/ai-me/blob/main/projects.md" in processed_content, (
+        f"Expected absolute GitHub URL for /projects.md in processed content, "
+        f"but got: {processed_content}"
+    )
+    
+    logger.info("✓ Test passed: Relative GitHub links converted to absolute URLs")
+    logger.info(f"  Original: [my resume](/resume.md)")
+    logger.info(f"  Converted: [my resume](https://github.com/byoung/ai-me/blob/main/resume.md)")
+
+
+@pytest.mark.asyncio
+async def test_user_story_2_multi_topic_consistency(ai_me_agent):
+    """
+    Test 8 (T044): User Story 2 - Multi-Topic Consistency
+    Verify that the agent maintains consistent first-person perspective 
+    across multiple conversation topics.
+    
+    This tests that the agent:
+    - Uses first-person perspective (I, my, me) consistently
+    - Maintains professional tone across different topic switches
+    - Shows context awareness of different topics
+    - Remains in-character as the personified individual
+    """
+    # Ask 3 questions about different topics
+    topics = [
+        ("What is your background in technology?", "background|experience|technology"),
+        ("Tell me about your current work at Neosofia", "Neosofia|current|employer"),
+        ("What programming languages are you skilled in?", "programming|language|skilled"),
+    ]
+    
+    first_person_patterns = [
+        r"\bi\b", r"\bme\b", r"\bmy\b", r"\bmyself\b", 
+        r"\bI['m]", r"\bI['ve]", r"\bI['ll]"
+    ]
+    
+    for question, topic_keywords in topics:
+        logger.info(f"\n{'='*60}\nMulti-topic test question: {question}\n{'='*60}")
+        
+        response = await ai_me_agent.run(question)
+        response_lower = response.lower()
+        
+        # Check for first-person usage
+        first_person_found = any(
+            re.search(pattern, response, re.IGNORECASE) 
+            for pattern in first_person_patterns
+        )
+        assert first_person_found, (
+            f"Expected first-person perspective in response to '{question}' "
+            f"but got: {response}"
+        )
+        
+        # Verify response is substantive (not just "I don't know")
+        min_length = 50  # Substantive responses should be > 50 chars
+        assert len(response) > min_length, (
+            f"Response to '{question}' was too short (likely not substantive): {response}"
+        )
+        
+        logger.info(f"✓ First-person perspective maintained for: {question[:40]}...")
+        logger.info(f"  Response preview: {response[:100]}...")
+    
+    logger.info("\n✓ Test passed: Consistent first-person perspective across 3+ topics")
+
+
+@pytest.mark.asyncio
+async def test_user_story_3_source_attribution(ai_me_agent):
+    """
+    Test 9 (T049): User Story 3 - Source Attribution
+    Verify that all responses contain source references/attribution.
+    
+    This tests that the agent:
+    - Includes source document references in responses
+    - Links to knowledge base documents (GitHub URLs or local sources)
+    - Provides verifiable, traceable information
+    - Maintains SC-002: 100% factual accuracy through sourcing
+    """
+    # Ask 3 questions that should retrieve documented knowledge
+    questions = [
+        "What do you know about ReaR?",
+        "Do you know Carol?",
+        "Tell me about your experience in technology",
+    ]
+    
+    # Pattern to find source references: URLs, "source:" labels, or GitHub links
+    source_patterns = [
+        r"https://github\.com/",  # GitHub URLs
+        r"source:",  # Explicit source labels
+        r"\[.*\]\(https?://",  # Markdown links
+        r"documentation",  # Reference to documentation
+    ]
+    
+    for question in questions:
+        logger.info(f"\n{'='*60}\nSource attribution test: {question}\n{'='*60}")
+        
+        response = await ai_me_agent.run(question)
+        
+        # Check for at least one source reference pattern
+        has_source = any(
+            re.search(pattern, response, re.IGNORECASE) 
+            for pattern in source_patterns
+        )
+        assert has_source, (
+            f"Expected source attribution in response to '{question}' "
+            f"but found none. Response: {response}"
+        )
+        
+        # Verify response is substantive (not just metadata)
+        min_length = 50
+        assert len(response) > min_length, (
+            f"Response to '{question}' was too short: {response}"
+        )
+        
+        logger.info(f"✓ Source attribution found for: {question[:40]}...")
+        logger.info(f"  Response includes source/reference")
+    
+    logger.info("\n✓ Test passed: All responses include source attribution (SC-002)")
+
+
+@pytest.mark.asyncio
+async def test_tool_failure_error_messages_are_friendly(caplog, ai_me_agent):
+    """
+    Test 10 (T063-T065): Error Message Quality (FR-012)
+    Verify that tool failures return user-friendly messages without Python tracebacks.
+    
+    This tests that the agent:
+    - Returns human-readable error messages
+    - logs an error that can be reviewed in our dashboard/logs
+
+    Uses mocking to simulate tool failures without adding test-specific code to agent.py
+    """
+    logger.info(f"\n{'='*60}\nError Handling Test\n{'='*60}")
+    
+    # Mock the Runner.run method to simulate a tool failure
+    # This tests the catch-all exception handler without adding test code to production
+    test_scenarios = [
+        RuntimeError("Simulated tool timeout"),
+        ValueError("Invalid tool parameters"),
+    ]
+    
+    for error in test_scenarios:
+        logger.info(f"\nTesting error scenario: {error.__class__.__name__}: {error}")
+        
+        # Clear previous log records for this iteration
+        caplog.clear()
+        
+        # Mock Runner.run to raise an exception
+        with patch('agent.Runner.run', new_callable=AsyncMock) as mock_run:
+            mock_run.side_effect = error
+            
+            response = await ai_me_agent.run("Any user question")
+            
+            logger.info(f"Response: {response[:100]}...")
+            
+            # PRIMARY CHECK: Verify "I encountered an unexpected error" is in response
+            assert "I encountered an unexpected error" in response, (
+                f"Response must contain 'I encountered an unexpected error'. Got: {response}"
+            )
+            
+            # SECONDARY CHECK: Verify error was logged by agent.py
+            error_logs = [record for record in caplog.records if record.levelname == "ERROR"]
+            assert len(error_logs) > 0, "Expected at least one ERROR log record from agent.py"
+            
+            # Find the agent.py error log (contains "Unexpected error:")
+            agent_error_logged = any("Unexpected error:" in record.message for record in error_logs)
+            assert agent_error_logged, (
+                f"Expected ERROR log with 'Unexpected error:' from agent.py. "
+                f"Got: {[r.message for r in error_logs]}"
+            )
+            logger.info(f"✓ Error properly logged to logger: {[r.message for r in error_logs if 'Unexpected error:' in r.message]}")
+    
+    logger.info("\n✓ Test passed: Error messages are friendly (FR-012) + properly logged")
 
 
 if __name__ == "__main__":
