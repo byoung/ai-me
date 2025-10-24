@@ -67,6 +67,10 @@ All agent responses normalized for clean, consistent output across platforms.
 - Output cleaned before returning to user
 - Output links should work
 
+### X. External Data Integration Policy
+
+For external services that do not provide a sanctioned public API (for example: LinkedIn), AI‑Me will perform data ingestion only via a human-in-the-loop browser automation process that requires interactive user authentication. Extracted content must be limited to publicly-visible information, reviewed by the human operator for accuracy and privacy before ingestion, and must never be collected via third-party services that require users to share credentials or that perform scraping on a user's behalf.
+
 ## Technology Stack Constraints
 
 - **Python**: 3.12+ only (via `requires-python = "~=3.12.0"`)
@@ -125,6 +129,14 @@ All agent responses normalized for clean, consistent output across platforms.
 7. **No credential leaks** - .gitignore and .dockerignore files to help prevent secret slips. Never build secrets into a dockerfile!
 8. **No notebook outputs in GIT** - you must clean up the code
 
+## Architectural Decision Records (ADRs)
+
+All major architectural decisions are documented in `architecture/adrs/`. ADRs provide detailed context, tradeoffs, and compliance notes that elaborate on constitution principles:
+
+- **ADR-001**: Human-in-the-loop Browser Automation for Third-Party Data Ingestion — Instantiates Principle X (External Data Integration Policy)
+
+Reference ADRs when evaluating PRs, designing new integrations, or proposing architecture changes.
+
 ## Governance
 
 This constitution supersedes all other practices and is the single source of truth for architectural decisions. All PRs and feature requests must verify compliance with these principles. Code review must check:
@@ -135,5 +147,7 @@ This constitution supersedes all other practices and is the single source of tru
 - Imports organized per PEP 8
 - Observability (logging) present
 - Output cleanliness (Unicode normalization)
+- External data integration policy adherence
+- Architectural decisions documented in `architecture/adrs/`
 
-**Version**: 1.0.0 | **Ratified**: 2025-10-23 | **Last Amended**: 2025-10-23
+**Version**: 1.0.1 | **Ratified**: 2025-10-23 | **Last Amended**: 2025-10-24

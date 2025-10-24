@@ -48,7 +48,6 @@ uv run pytest src/test.py::test_rear_knowledge_contains_it245 -v
 
 **Configuration**:
 - **Temperature**: Set to 0.0 for deterministic, reproducible responses
-- **MCP Servers**: Disabled by default for faster test execution
 - **Model**: Uses model specified in config (default: `openai/openai/gpt-oss-120b` via Groq)
 - **Data Source**: `test_data/` directory (configured via `doc_root` parameter)
 - **GitHub Repos**: Disabled (`GITHUB_REPOS=""`) for faster test execution
