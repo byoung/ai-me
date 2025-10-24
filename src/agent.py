@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field, computed_field, ConfigDict, SecretStr
 from agents import Agent, Tool, function_tool, Runner
 from agents.result import RunResult
+from agents.run import RunConfig
 from agents.mcp import MCPServerStdio
 from config import setup_logger
  
@@ -329,7 +330,7 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
         Args:
             agent_prompt: Optional prompt override. If None, uses self.agent_prompt.
             mcp_params: Optional list of MCP server parameters to initialize.
-                If None, no MCP servers will be initialized. To use memory
+                If None or empty, no MCP servers will be initialized. To use memory
                 functionality, caller must explicitly pass mcp_params including
                 get_mcp_memory_params(session_id) with a unique session_id.
             additional_tools: Optional list of additional tools to append to
@@ -347,7 +348,7 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
 
         # Use provided prompt or fall back to default
         prompt = agent_prompt if agent_prompt is not None else self.agent_prompt
-        logger.debug(f"Creating ai-me agent with prompt: {prompt}")
+        logger.debug(f"Creating ai-me agent with prompt: {prompt[:100]}...")
         
         # Build tools list - get_local_info is always the default first tool
         tools = [self.get_local_info_tool()]
@@ -401,8 +402,13 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
         json_input = {"session_id": self.session_id, "user_input": user_input}
         logger.info(json.dumps(json_input))
         
+        run_config = RunConfig(tracing_disabled=True)
+
         try:
-            result: RunResult = await Runner.run(self._agent, user_input, **runner_kwargs)
+            result: RunResult = await Runner.run(self._agent, 
+                                                 user_input, 
+                                                 run_config=run_config, 
+                                                 **runner_kwargs)
         except Exception as e:
             error_str = str(e).lower()
             

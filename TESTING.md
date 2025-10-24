@@ -32,10 +32,10 @@ From project root:
 uv run pytest src/test.py -v
 
 # With detailed output
-uv run pytest src/test.py -v -s
+uv run pytest src/test.py -v -o log_cli=true --log-cli-level=INFO --capture=no
 
 # Specific test
-uv run pytest src/test.py::test_rear_knowledge_contains_it245 -v
+uv run pytest src/test.py::test_rear_knowledge_contains_it245 -v -o log_cli=true --log-cli-level=INFO --capture=no
 ```
 
 ## Test Architecture
@@ -82,20 +82,4 @@ The temperature of 0 ensures that the agent's responses are consistent across te
    - ✅ Memory tool doesn't share state (different users in Memory graphs)
    - ✅ Each session gets unique `session_id` in logs (check `uv run src/app.py` output)
 
-### Why Manual Testing?
 
-Integration tests for concurrent browser sessions are:
-- **Brittle**: Timing-dependent, fail randomly due to race conditions
-- **Slow**: Multiple concurrent LLM calls slow down test execution
-- **Fragile**: Heavy on resources, fail in CI/CD environments
-- **Hard to debug**: Concurrent failures are difficult to reproduce and fix
-
-
-## Future Enhancements
-- [ ] Add tests for error handling and edge cases
-- [ ] Add performance benchmarks
-- [ ] Add tests for different document sources
-- [ ] Add tests for agent memory/context management
-- [ ] Add tests for multi-turn conversations
-- [ ] Test with MCP servers enabled
-- [ ] Add more comprehensive RAG quality tests
