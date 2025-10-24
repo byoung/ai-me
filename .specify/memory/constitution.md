@@ -71,6 +71,18 @@ All agent responses normalized for clean, consistent output across platforms.
 
 For external services that do not provide a sanctioned public API (for example: LinkedIn), AI‑Me will perform data ingestion only via a human-in-the-loop browser automation process that requires interactive user authentication. Extracted content must be limited to publicly-visible information, reviewed by the human operator for accuracy and privacy before ingestion, and must never be collected via third-party services that require users to share credentials or that perform scraping on a user's behalf.
 
+### XI. Full Requirements Traceability
+
+All software must maintain complete traceability between requirements, implementation, and tests. No gaps are permitted in the traceability matrix.
+- **Every requirement** must map to one or more implementation/design blocks in code (via docstrings linking requirement IDs)
+- **Every implementation block** must belong to at least one requirement (no code without a requirement)
+- **Every test** must validate one or more requirements (no tests without requirement linkage)
+- Requirements assigned unique identifiers (e.g., `REQ-001`, `FR-001`, `NFR-001`) in all specification documents
+- Implementation functions/methods document their requirement IDs in docstrings (e.g., `"""Implements REQ-001: ..."""`)
+- Test functions document which requirements they validate in docstrings (e.g., `"""Tests REQ-001: ..."""`)
+- Validation tooling should spot-check traceability; maintainers verify before code review
+- This ensures: (a) no implemented features lack requirements, (b) no requirements go unimplemented, (c) all features are tested, (d) the system behaves exactly as specified—nothing more, nothing less
+
 ## Technology Stack Constraints
 
 - **Python**: 3.12+ only (via `requires-python = "~=3.12.0"`)
@@ -128,6 +140,8 @@ For external services that do not provide a sanctioned public API (for example: 
 6. **No unstructured logs** - JSON for machines, readable for humans
 7. **No credential leaks** - .gitignore and .dockerignore files to help prevent secret slips. Never build secrets into a dockerfile!
 8. **No notebook outputs in GIT** - you must clean up the code
+9. **No traceability gaps** - Every requirement, implementation, and test must be linked and documented
+10. **No unspecified code** - Every function must serve at least one requirement
 
 ## Architectural Decision Records (ADRs)
 
@@ -149,5 +163,6 @@ This constitution supersedes all other practices and is the single source of tru
 - Output cleanliness (Unicode normalization)
 - External data integration policy adherence
 - Architectural decisions documented in `architecture/adrs/`
+- Requirements traceability matrix is complete (every requirement has implementation + tests)
 
-**Version**: 1.0.1 | **Ratified**: 2025-10-23 | **Last Amended**: 2025-10-24
+**Version**: 1.1.0 | **Ratified**: 2025-10-23 | **Last Amended**: 2025-10-24
