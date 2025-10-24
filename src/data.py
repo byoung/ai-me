@@ -53,6 +53,8 @@ class DataManager:
         """
         Initialize data manager with configuration.
         
+        Implements FR-002 (Knowledge Retrieval).
+        
         Args:
             config: Optional DataManagerConfig instance. If not provided, one will be created
                 from kwargs. For backward compatibility, can also pass individual parameters.
@@ -79,6 +81,8 @@ class DataManager:
     def load_local_documents(self) -> List[Document]:
         """
         Load documents from local directory. Returns empty list if directory not found.
+        
+        Implements FR-002 (Knowledge Retrieval).
         """
         logger.info(f"Loading local documents from: {self.config.doc_root}")
         
@@ -121,6 +125,8 @@ class DataManager:
         """
         Load documents from GitHub repositories.
         
+        Implements FR-002 (Knowledge Retrieval), FR-010 (Optional Tools - GitHub).
+        
         Args:
             repos: List of repos (owner/repo format). Defaults to github_repos from init.
             file_filter: Optional filter function for files. Defaults to .md files.
@@ -134,6 +140,10 @@ class DataManager:
         
         if file_filter is None:
             def file_filter(fp: str) -> bool:
+                """Filter function for GitHub document loading.
+                
+                Implements FR-002 (Knowledge Retrieval): Filters markdown files for document loading.
+                """
                 fp_lower = fp.lower()
                 basename = os.path.basename(fp).lower()
                 # TBD: Make this configurable once chunking logic is enhanced
@@ -179,6 +189,8 @@ class DataManager:
         """
         Hydrate links in markdown documents to point to GitHub.
         
+        Implements FR-004 (Source Attribution).
+        
         Args:
             docs: List of documents to process
         
@@ -208,6 +220,8 @@ class DataManager:
         """
         Split documents into smaller chunks for better retrieval. Uses header-based splitting to
         preserve document structure, then further splits by size if needed.
+        
+        Implements FR-002 (Knowledge Retrieval).
         
         Args:
             documents: List of documents to chunk
@@ -250,6 +264,8 @@ class DataManager:
         if doc_load_local is set, and GitHub documents if github_repos (or
         self.config.github_repos) is set.
 
+        Implements FR-002 (Knowledge Retrieval).
+
         Args:
             github_repos: Optional list of specific repos to load. Uses
                 self.config.github_repos if None.
@@ -277,6 +293,8 @@ class DataManager:
         """
         Get or create embeddings model.
         
+        Implements FR-002 (Knowledge Retrieval).
+        
         Returns:
             HuggingFace embeddings instance
         """
@@ -288,6 +306,8 @@ class DataManager:
     def create_vectorstore(self, chunks: List[Document], reset: bool = True) -> Chroma:
         """
         Create ChromaDB vectorstore from document chunks.
+        
+        Implements FR-002 (Knowledge Retrieval)
         
         Args:
             chunks: List of document chunks to store.
@@ -331,6 +351,8 @@ class DataManager:
         loads local documents if doc_load_local is set, and GitHub documents if
         github_repos is specified.
 
+        Implements FR-002 (Knowledge Retrieval).
+
         Args:
             github_repos: Optional list of specific repos to load. Uses
                 self.config.github_repos if None.
@@ -347,6 +369,8 @@ class DataManager:
         """
         Retrieve and print chunks from the vectorstore whose metadata['file_path'] ends with the
         given filename. Returns a list of (doc_id, metadata, document).
+        
+        DEBUG TOOL: Utility/debugging function - no corresponding FR/NFR.
         """
         all_docs = self._vectorstore.get()
         logger.info(f"Searching for chunks from file: {filename}")

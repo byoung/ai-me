@@ -23,6 +23,9 @@ load_dotenv()
 def setup_logger(name: str) -> logging.Logger:
     """
     Create and configure a logger with consistent syslog-style formatting.
+    
+    Implements NFR-003 (Structured Logging).
+    
     Multi-line messages will have continuation lines indented for readability.
     
     Log level can be controlled via LOG_LEVEL environment variable (DEBUG, INFO, WARNING, ERROR).
@@ -214,7 +217,15 @@ class Config(BaseSettings):
         return "\n".join(lines)
     
     def __repr__(self) -> str:
+        """Return string representation of Config with secrets hidden.
+        
+        DEBUG: Debug utility for logging/debugging configuration state.
+        """
         return self._safe_repr()
     
     def __str__(self) -> str:
+        """Return human-readable string representation of Config with secrets hidden.
+        
+        DEBUG: Debug utility for logging/debugging configuration state.
+        """
         return self._safe_repr()

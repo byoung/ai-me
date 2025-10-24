@@ -19,6 +19,8 @@
 
 ### User Story 1 - Chat with Personified Agent About Expertise (Priority: P1)
 
+**Implements**: FR-001, FR-002, FR-003, FR-004, FR-005
+
 A user opens the chat interface and asks the personified AI agent a question about the person's professional knowledge, projects, or experience. The agent responds with accurate information that sounds like it comes from the person themselves, using first-person perspective and maintaining the person's authentic voice and philosophies.
 
 **Why this priority**: This is the core value proposition—users must be able to have conversations with an agent that authentically represents a real person's expertise. Without this, the application has no purpose.
@@ -35,6 +37,8 @@ A user opens the chat interface and asks the personified AI agent a question abo
 
 ### User Story 2 - Interact Across Multiple Conversation Topics (Priority: P2)
 
+**Implements**: FR-001, FR-005, FR-007, NFR-002
+
 A user has multiple conversations with the agent across different topics (e.g., professional questions, personal philosophies, project specifics). Each conversation maintains context about the person's identity and answers are consistent across topics.
 
 **Why this priority**: Users need to be able to explore different aspects of the person's knowledge in a single session without losing the sense that they're talking to one consistent person. This enables deeper engagement.
@@ -50,6 +54,8 @@ A user has multiple conversations with the agent across different topics (e.g., 
 ---
 
 ### User Story 3 - Access Sourced Information with Attribution (Priority: P2)
+
+**Implements**: FR-004, FR-011, NFR-003
 
 A user asks the agent a question, and the agent provides a response with clear references to where the information came from (e.g., "As mentioned in my project documentation..." or "Per my resume..."). Users can understand the credibility and source of the agent's responses.
 
@@ -85,19 +91,61 @@ A user asks the agent a question, and the agent provides a response with clear r
 
 ### Functional Requirements
 
+<a id="fr-001-chat-interface"></a>
 - **FR-001**: System MUST provide a chat interface where users can send messages and receive responses
+
+<a id="fr-002-knowledge-retrieval"></a>
 - **FR-002**: System MUST retrieve relevant information from the person's knowledge base (admin-configurable markdown files in a public GitHub repository) based on user queries
+
+<a id="fr-003-first-person-persona"></a>
 - **FR-003**: System MUST respond in first-person perspective, maintaining the persona of the person being represented
+
+<a id="fr-004-source-attribution"></a>
 - **FR-004**: System MUST reference sources for factual claims (e.g., "per my documentation on X")
+
+<a id="fr-005-session-history"></a>
 - **FR-005**: System MUST maintain conversation history within a single session
+
+<a id="fr-006-knowledge-gap-handling"></a>
 - **FR-006**: System MUST handle cases where the knowledge base doesn't contain an answer by gracefully indicating knowledge gaps
+
+<a id="fr-007-session-isolation"></a>
 - **FR-007**: System MUST support conversation threads/sessions isolated from other users
+
+<a id="fr-008-output-normalization"></a>
 - **FR-008**: System MUST normalize and clean output to ensure consistent, readable responses across platforms
+
+<a id="fr-009-mandatory-tools"></a>
 - **FR-009**: System MUST include mandatory tools: Time (current date/time) and Memory (session-scoped user attribute tracking)
+
+<a id="fr-010-optional-tools"></a>
 - **FR-010**: System MUST support optional tools: GitHub (activated if GitHub PAT environment variable set) and LinkedIn (activated if LinkedIn API token environment variable set)
+
+<a id="fr-011-conflict-resolution--logging"></a>
 - **FR-011**: System MUST prioritize conflicting documentation by vector search relevance score and log conflicts for human review
+
+<a id="fr-012-tool-error-handling"></a>
 - **FR-012**: When external tools fail or become unavailable, system MUST return a user-friendly error message and wait for tool recovery before processing further queries
+
+<a id="fr-013-memory-tool"></a>
 - **FR-013**: Memory tool MUST track session-scoped user attributes (name, profession, interests, hobbies) to personalize responses; memory resets between sessions
+
+### Non-Functional Requirements
+
+<a id="nfr-001-sub-5s-response"></a>
+- **NFR-001**: System MUST respond to user queries in under 5 seconds (P95 latency)
+
+<a id="nfr-002-10-concurrent-sessions"></a>
+- **NFR-002**: System MUST support at least 10 concurrent independent conversation sessions without performance degradation
+
+<a id="nfr-003-structured-logging"></a>
+- **NFR-003**: System MUST log all tool failures and conflicts with structured JSON format (Principle VII: Observability First)
+
+<a id="nfr-004-unicode-normalization"></a>
+- **NFR-004**: System MUST normalize Unicode output for clean, consistent display across platforms (Principle IX: Unicode Normalization)
+
+<a id="nfr-005-session-isolation"></a>
+- **NFR-005**: System MUST enforce session isolation with no shared mutable state across user conversations (Principle IV: Session Isolation)
 
 ### Key Entities
 
@@ -114,14 +162,29 @@ A user asks the agent a question, and the agent provides a response with clear r
 
 ### Measurable Outcomes
 
-- **SC-001**: Users perceive responses as authentically representing the person's voice and perspective (test cases + selective sampling of logs show less than 10% false +/- rate)
-- **SC-002**: Responses are factually accurate and sourced from the person's documentation (100% of sample responses contain only information present in knowledge base)
-- **SC-003**: Users receive answers to their questions on topics covered in the documentation (90% of in-scope questions receive substantive responses)
-- **SC-004**: System correctly handles knowledge gaps by indicating them to users (100% of out-of-scope questions receive explicit "I don't have documentation on that" acknowledgment)
-- **SC-005**: Conversation can be completed in natural timeframe with responsive interaction (agent responds to user queries in under 5 seconds)
-- **SC-006**: Multiple simultaneous users can interact with the agent without interference (10+ concurrent conversations function independently)
-- **SC-007**: Tool failures are handled gracefully with user-friendly error messages (100% of tool failures result in appropriate error messaging, not crashes)
-- **SC-008**: Session-scoped memory improves personalization within a conversation (users report agent responses feel more tailored as conversation progresses)
+<a id="sc-001-validates-fr-003"></a>
+- **SC-001** *(validates FR-003)*: Users perceive responses as authentically representing the person's voice and perspective (test cases + selective sampling of logs show less than 10% false +/- rate)
+
+<a id="sc-002-validates-fr-002-fr-004"></a>
+- **SC-002** *(validates FR-002, FR-004)*: Responses are factually accurate and sourced from the person's documentation (100% of sample responses contain only information present in knowledge base)
+
+<a id="sc-003-validates-fr-006"></a>
+- **SC-003** *(validates FR-006)*: Users receive answers to their questions on topics covered in the documentation (90% of in-scope questions receive substantive responses)
+
+<a id="sc-004-validates-fr-006"></a>
+- **SC-004** *(validates FR-006)*: System correctly handles knowledge gaps by indicating them to users (100% of out-of-scope questions receive explicit "I don't have documentation on that" acknowledgment)
+
+<a id="sc-005-validates-nfr-001"></a>
+- **SC-005** *(validates NFR-001)*: Conversation can be completed in natural timeframe with responsive interaction (agent responds to user queries in under 5 seconds)
+
+<a id="sc-006-validates-nfr-002"></a>
+- **SC-006** *(validates NFR-002)*: Multiple simultaneous users can interact with the agent without interference (10+ concurrent conversations function independently)
+
+<a id="sc-007-validates-fr-012"></a>
+- **SC-007** *(validates FR-012)*: Tool failures are handled gracefully with user-friendly error messages (100% of tool failures result in appropriate error messaging, not crashes)
+
+<a id="sc-008-validates-fr-013"></a>
+- **SC-008** *(validates FR-013)*: Session-scoped memory improves personalization within a conversation (users report agent responses feel more tailored as conversation progresses)
 
 ### Assumptions
 
@@ -133,3 +196,50 @@ A user asks the agent a question, and the agent provides a response with clear r
 - Time tool (current date/time) and Memory tool (session-scoped user attributes) are always available in the operating environment
 - GitHub PAT and LinkedIn API tokens, if provided, will be available as environment variables; tools remain inactive without credentials
 - Users are comfortable with session-scoped memory (attributes not persisted across separate sessions without explicit opt-in mechanism)
+
+## Requirements Traceability Matrix
+
+### Functional Requirements Mapping
+
+| Requirement | User Stories | Success Criteria | Implementation Modules | Tests |
+|---|---|---|---|---|
+| [**FR-001**](#fr-001-chat-interface) (Chat Interface) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1), [US2](#user-story-2---interact-across-multiple-conversation-topics-priority-p2) | [SC-001](#sc-001-validates-fr-003), [SC-005](#sc-005-validates-nfr-001), [SC-006](#sc-006-validates-nfr-002) | [`src/app.py::initialize_session()`](../../src/app.py), [`src/app.py::chat()`](../../src/app.py) | [`test_user_story_2_multi_topic_consistency()`](../../src/test.py) |
+| [**FR-002**](#fr-002-knowledge-retrieval) (Knowledge Retrieval) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1) | [SC-002](#sc-002-validates-fr-002-fr-004), [SC-003](#sc-003-validates-fr-006) | [`src/data.py::load_local_documents()`](../../src/data.py), [`src/data.py::load_github_documents()`](../../src/data.py), [`src/data.py::chunk_documents()`](../../src/data.py), [`src/data.py::create_vectorstore()`](../../src/data.py) | [`test_rear_knowledge_contains_it245()`](../../src/test.py), [`test_carol_knowledge_contains_product()`](../../src/test.py), [`test_user_story_3_source_attribution()`](../../src/test.py) |
+| [**FR-003**](#fr-003-first-person-persona) (First-Person Persona) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1), [US2](#user-story-2---interact-across-multiple-conversation-topics-priority-p2) | [SC-001](#sc-001-validates-fr-003) | [`src/agent.py::create_ai_me_agent()`](../../src/agent.py), [`src/agent.py::run()`](../../src/agent.py) | [`test_rear_knowledge_contains_it245()`](../../src/test.py), [`test_carol_knowledge_contains_product()`](../../src/test.py), [`test_user_story_2_multi_topic_consistency()`](../../src/test.py) |
+| [**FR-004**](#fr-004-source-attribution) (Source Attribution) | [US3](#user-story-3---access-sourced-information-with-attribution-priority-p2) | [SC-002](#sc-002-validates-fr-002-fr-004) | [`src/data.py::process_documents()`](../../src/data.py), [`src/agent.py::get_local_info_tool()`](../../src/agent.py) | [`test_github_relative_links_converted_to_absolute_urls()`](../../src/test.py), [`test_user_story_3_source_attribution()`](../../src/test.py) |
+| [**FR-005**](#fr-005-session-history) (Session History) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1), [US2](#user-story-2---interact-across-multiple-conversation-topics-priority-p2) | [SC-005](#sc-005-validates-nfr-001) | [`src/app.py::chat()`](../../src/app.py) | [`test_user_story_2_multi_topic_consistency()`](../../src/test.py) |
+| [**FR-006**](#fr-006-knowledge-gap-handling) (Knowledge Gap Handling) | [US2](#user-story-2---interact-across-multiple-conversation-topics-priority-p2) | [SC-003](#sc-003-validates-fr-006), [SC-004](#sc-004-validates-fr-006) | [`src/agent.py::run()`](../../src/agent.py) | [`test_unknown_person_contains_negative_response()`](../../src/test.py) |
+| [**FR-007**](#fr-007-session-isolation) (Session Isolation) | [US2](#user-story-2---interact-across-multiple-conversation-topics-priority-p2) | [SC-006](#sc-006-validates-nfr-002) | [`src/app.py::initialize_session()`](../../src/app.py), [`src/app.py::get_session_status()`](../../src/app.py), [`src/app.py::chat()`](../../src/app.py) | [`test_user_story_2_multi_topic_consistency()`](../../src/test.py) |
+| [**FR-008**](#fr-008-output-normalization) (Output Normalization) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1) | [SC-001](#sc-001-validates-fr-003) | [`src/agent.py::run()`](../../src/agent.py) | All tests (implicit in response validation) |
+| [**FR-009**](#fr-009-mandatory-tools) (Mandatory Tools) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1) | [SC-005](#sc-005-validates-nfr-001), [SC-007](#sc-007-validates-fr-012) | [`src/agent.py::mcp_time_params`](../../src/agent.py), [`src/agent.py::get_mcp_memory_params()`](../../src/agent.py), [`src/agent.py::setup_mcp_servers()`](../../src/agent.py) | [`test_mcp_time_server_returns_current_date()`](../../src/test.py), [`test_mcp_memory_server_remembers_favorite_color()`](../../src/test.py) |
+| [**FR-010**](#fr-010-optional-tools) (Optional Tools) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1) | [SC-007](#sc-007-validates-fr-012) | [`src/agent.py::mcp_github_params`](../../src/agent.py), [`src/agent.py::setup_mcp_servers()`](../../src/agent.py), [`src/data.py::load_github_documents()`](../../src/data.py) | [`test_github_commits_contains_shas()`](../../src/test.py) |
+| [**FR-011**](#fr-011-conflict-resolution--logging) (Conflict Resolution) | [US3](#user-story-3---access-sourced-information-with-attribution-priority-p2) | [SC-002](#sc-002-validates-fr-002-fr-004) | [`src/data.py::load_github_documents()`](../../src/data.py), [`src/agent.py::get_local_info_tool()`](../../src/agent.py) | [`test_user_story_3_source_attribution()`](../../src/test.py) |
+| [**FR-012**](#fr-012-tool-error-handling) (Tool Error Handling) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1), [US3](#user-story-3---access-sourced-information-with-attribution-priority-p2) | [SC-007](#sc-007-validates-fr-012) | [`src/agent.py::setup_mcp_servers()`](../../src/agent.py), [`src/agent.py::run()`](../../src/agent.py), [`src/agent.py::cleanup()`](../../src/agent.py) | [`test_tool_failure_error_messages_are_friendly()`](../../src/test.py) |
+| [**FR-013**](#fr-013-memory-tool) (Memory Tool) | [US2](#user-story-2---interact-across-multiple-conversation-topics-priority-p2) | [SC-008](#sc-008-validates-fr-013) | [`src/agent.py::get_mcp_memory_params()`](../../src/agent.py) | [`test_mcp_memory_server_remembers_favorite_color()`](../../src/test.py) |
+
+### Non-Functional Requirements Mapping
+
+| Requirement | User Stories | Success Criteria | Implementation Modules | Tests |
+|---|---|---|---|---|
+| [**NFR-001**](#nfr-001-sub-5s-response) (Sub-5s Response) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1), [US2](#user-story-2---interact-across-multiple-conversation-topics-priority-p2) | [SC-005](#sc-005-validates-nfr-001) | [`src/agent.py::run()`](../../src/agent.py), [`src/data.py::create_vectorstore()`](../../src/data.py) | [`test_mcp_time_server_returns_current_date()`](../../src/test.py) |
+| [**NFR-002**](#nfr-002-10-concurrent-sessions) (10+ Concurrent Sessions) | [US2](#user-story-2---interact-across-multiple-conversation-topics-priority-p2) | [SC-006](#sc-006-validates-nfr-002) | [`src/app.py::initialize_session()`](../../src/app.py), [`src/app.py::chat()`](../../src/app.py), [`src/agent.py::AIMeAgent`](../../src/agent.py) | [`test_user_story_2_multi_topic_consistency()`](../../src/test.py), [`test_mcp_memory_server_remembers_favorite_color()`](../../src/test.py) |
+| [**NFR-003**](#nfr-003-structured-logging) (Structured Logging) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1), [US3](#user-story-3---access-sourced-information-with-attribution-priority-p2) | [SC-007](#sc-007-validates-fr-012) | [`src/config.py::setup_logger()`](../../src/config.py), [`src/agent.py::run()`](../../src/agent.py), [`src/app.py::chat()`](../../src/app.py) | [`test_user_story_3_source_attribution()`](../../src/test.py), [`test_tool_failure_error_messages_are_friendly()`](../../src/test.py) |
+| [**NFR-004**](#nfr-004-unicode-normalization) (Unicode Normalization) | [US1](#user-story-1---chat-with-personified-agent-about-expertise-priority-p1) | [SC-001](#sc-001-validates-fr-003) | [`src/agent.py::run()`](../../src/agent.py) | All tests (implicit in response validation) |
+| [**NFR-005**](#nfr-005-session-isolation) (Session Isolation) | [US2](#user-story-2---interact-across-multiple-conversation-topics-priority-p2) | [SC-006](#sc-006-validates-nfr-002) | [`src/app.py::initialize_session()`](../../src/app.py), [`src/agent.py::cleanup()`](../../src/agent.py) | [`test_user_story_2_multi_topic_consistency()`](../../src/test.py) |
+
+### Implementation Verification
+
+**Note**: Implementation code must include docstring linkage per Principle XI (Full Requirements Traceability):
+- Each function/method MUST include docstring: `"""Implements FR-XXX: ..."""` or `"""Implements NFR-XXX: ..."""`
+- Each test MUST include docstring: `"""Tests FR-XXX: ..."""` or `"""Tests NFR-XXX: ..."""`
+- No code without requirement linkage; no requirements without implementation
+
+### Test Requirements
+
+All functional and non-functional requirements MUST have corresponding test coverage in `src/test.py`:
+- **Unit tests** validate individual requirement implementations (e.g., FR-003 persona consistency)
+- **Integration tests** validate requirement interactions (e.g., FR-001 + FR-002 = chat retrieval)
+- **Contract tests** validate tool integrations (e.g., FR-009 Time/Memory tool availability)
+
+Test naming convention: `test_<requirement_id>_<validation_aspect>()`  
+Example: `test_fr001_chat_interface_accepts_user_input()`

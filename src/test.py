@@ -96,8 +96,8 @@ async def ai_me_agent():
 
 @pytest.mark.asyncio
 async def test_rear_knowledge_contains_it245(ai_me_agent):
-    """
-    Test 1: Verify that asking about ReaR returns information containing IT-245.
+    """Tests FR-002, FR-003: Verify that asking about ReaR returns information containing IT-245.
+    
     This tests that the agent can retrieve and return specific technical information.
     """
     response = await ai_me_agent.run("What do you know about ReaR?")
@@ -108,8 +108,8 @@ async def test_rear_knowledge_contains_it245(ai_me_agent):
 
 @pytest.mark.asyncio
 async def test_github_commits_contains_shas(ai_me_agent):
-    """
-    Test 2: Verify that asking about recent commits returns commit SHAs.
+    """Tests FR-010, FR-012: Verify that asking about recent commits returns commit SHAs.
+    
     This tests the agent's integration with GitHub MCP server.
     The query explicitly specifies a repo to test MCP tool calling.
     """
@@ -131,7 +131,7 @@ async def test_github_commits_contains_shas(ai_me_agent):
 
 @pytest.mark.asyncio
 async def test_unknown_person_contains_negative_response(ai_me_agent):
-    """Test 3: Verify that asking about an unknown person returns a negative response."""    
+    """Tests FR-006: Verify that asking about an unknown person returns a negative response."""    
     response = await ai_me_agent.run("who is slartibartfast?")
     
     negative_indicators = [
@@ -150,7 +150,7 @@ async def test_unknown_person_contains_negative_response(ai_me_agent):
 
 @pytest.mark.asyncio
 async def test_carol_knowledge_contains_product(ai_me_agent):
-    """Test 4: Verify that asking about Carol returns information containing 'product'."""
+    """Tests FR-002, FR-003: Verify that asking about Carol returns information containing 'product'."""
     response_raw = await ai_me_agent.run("Do you know Carol?")
     response = response_raw.lower()  # Convert to lowercase for matching
     
@@ -163,7 +163,7 @@ async def test_carol_knowledge_contains_product(ai_me_agent):
 
 @pytest.mark.asyncio
 async def test_mcp_time_server_returns_current_date(ai_me_agent):
-    """Test 5: Verify that the MCP time server returns the current date."""
+    """Tests FR-009, NFR-001: Verify that the MCP time server returns the current date."""
     
     response = await ai_me_agent.run("What is today's date?")
 
@@ -196,7 +196,7 @@ async def test_mcp_time_server_returns_current_date(ai_me_agent):
 
 @pytest.mark.asyncio
 async def test_mcp_memory_server_remembers_favorite_color(ai_me_agent):
-    """Test 6: Verify that the MCP memory server persists information across interactions."""
+    """Tests FR-013, NFR-002: Verify that the MCP memory server persists information across interactions."""
 
     await ai_me_agent.run("My favorite color is chartreuse.")
     response2 = await ai_me_agent.run("What's my favorite color?")
@@ -215,7 +215,7 @@ async def test_mcp_memory_server_remembers_favorite_color(ai_me_agent):
 
 @pytest.mark.asyncio
 async def test_github_relative_links_converted_to_absolute_urls():
-    """Test 7: Verify that relative links in GitHub documents are converted to absolute GitHub URLs.
+    """Tests FR-004: Verify that relative links in GitHub documents are converted to absolute GitHub URLs.
     
     This test validates FR-004 (Source Attribution): that when documents are loaded from GitHub
     with relative links (e.g., /resume.md), they are rewritten to full GitHub URLs 
@@ -261,7 +261,8 @@ async def test_github_relative_links_converted_to_absolute_urls():
 @pytest.mark.asyncio
 async def test_user_story_2_multi_topic_consistency(ai_me_agent):
     """
-    Test 8 (T044): User Story 2 - Multi-Topic Consistency
+    Tests FR-001, FR-003, FR-005, NFR-002: User Story 2 - Multi-Topic Consistency
+    
     Verify that the agent maintains consistent first-person perspective 
     across multiple conversation topics.
     
@@ -314,7 +315,8 @@ async def test_user_story_2_multi_topic_consistency(ai_me_agent):
 @pytest.mark.asyncio
 async def test_user_story_3_source_attribution(ai_me_agent):
     """
-    Test 9 (T049): User Story 3 - Source Attribution
+    Tests FR-002, FR-004, FR-011, NFR-003: User Story 3 - Source Attribution
+    
     Verify that all responses contain source references/attribution.
     
     This tests that the agent:
@@ -368,7 +370,8 @@ async def test_user_story_3_source_attribution(ai_me_agent):
 @pytest.mark.asyncio
 async def test_tool_failure_error_messages_are_friendly(caplog, ai_me_agent):
     """
-    Test 10 (T063-T065): Error Message Quality (FR-012)
+    Tests FR-012, NFR-003: Error Message Quality (FR-012)
+    
     Verify that tool failures return user-friendly messages without Python tracebacks.
     
     This tests that the agent:

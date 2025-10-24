@@ -21,7 +21,10 @@ session_agents = {}
 
 
 async def initialize_session(session_id: str) -> None:
-    """Initialize and warmup agent for a new session."""
+    """Initialize and warmup agent for a new session.
+    
+    Implements FR-001 (Chat Interface), FR-007 (Session Isolation), NFR-002 (Concurrent Sessions).
+    """
     if session_id in session_agents:
         return  # Already initialized
     
@@ -59,7 +62,10 @@ async def initialize_session(session_id: str) -> None:
 
 
 async def get_session_status(request: Request):
-    """Initialize session and return status. Called on page load."""
+    """Initialize session and return status. Called on page load.
+    
+    Implements FR-001 (Chat Interface), FR-007 (Session Isolation).
+    """
     session_id = request.session_hash
     if session_id not in session_agents:
         await initialize_session(session_id)
@@ -67,6 +73,10 @@ async def get_session_status(request: Request):
 
 
 async def chat(user_input: str, history, request: Request):
+    """Process user input and return agent response.
+    
+    Implements FR-001 (Chat Interface), FR-005 (Session History), FR-007 (Session Isolation).
+    """
     session_id = request.session_hash
     
     # Initialize agent for this session if not already done

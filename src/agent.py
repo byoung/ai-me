@@ -55,6 +55,8 @@ class AIMeAgent(BaseModel):
     def mcp_github_params(self) -> MCPServerParams:
         """GitHub MCP server params with token injected from instance.
         
+        Implements FR-010 (Optional Tools - GitHub).
+        
         Uses the official GitHub MCP server binary maintained by GitHub.
         Package: github/github-mcp-server
         GitHub: https://github.com/github/github-mcp-server
@@ -89,7 +91,10 @@ class AIMeAgent(BaseModel):
     @computed_field
     @property
     def mcp_time_params(self) -> MCPServerParams:
-        """Time MCP server params."""
+        """Time MCP server params.
+        
+        Implements FR-009 (Mandatory Tools - Time).
+        """
         return MCPServerParams(
             command="uvx",
             args=["mcp-server-time", "--local-timezone=Etc/UTC"],
@@ -99,6 +104,8 @@ class AIMeAgent(BaseModel):
     
     def get_mcp_memory_params(self, session_id: str) -> MCPServerParams:
         """Memory MCP server params for knowledge graph-based session memory.
+        
+        Implements FR-009 (Mandatory Tools - Memory), FR-013 (Memory Tool).
         
         Creates a session-specific temporary file for memory storage to ensure complete
         isolation between sessions. Each session gets its own memory graph that is cleaned
@@ -232,7 +239,10 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
 """
     
     async def setup_mcp_servers(self, mcp_params_list: List[MCPServerParams]):
-        """Initialize and connect all MCP servers from provided parameters list."""
+        """Initialize and connect all MCP servers from provided parameters list.
+        
+        Implements FR-009 (Mandatory Tools), FR-010 (Optional Tools), FR-012 (Tool Error Handling).
+        """
         
         mcp_servers_local = []
         for i, params in enumerate(mcp_params_list):
@@ -262,11 +272,17 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
         return mcp_servers_local
     
     def get_local_info_tool(self):
-        """Create the get_local_info function tool."""
+        """Create the get_local_info function tool.
+        
+        Implements FR-002 (Knowledge Retrieval), FR-004 (Source Attribution).
+        """
         
         @function_tool
         async def get_local_info(query: str) -> str:
             """get more context based on the subject of the question.
+            
+            Implements FR-002 (Knowledge Retrieval), FR-004 (Source Attribution).
+            
             Our vector store will contain information about our personal and professional
             experience in all things technology."""
             logger.info(f"QUERY: {query}")
@@ -306,6 +322,9 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
         additional_tools: Optional[List[Tool]] = None,
     ) -> Agent:
         """Create the main ai-me agent.
+        
+        Implements FR-001 (Chat Interface), FR-003 (First-Person Persona), FR-009 (Mandatory Tools),
+        FR-010 (Optional Tools).
 
         Args:
             agent_prompt: Optional prompt override. If None, uses self.agent_prompt.
@@ -372,7 +391,11 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
         return ai_me
 
     async def run(self, user_input: str, **runner_kwargs) -> str:
-        """Run the agent and post-process output to remove Unicode brackets."""
+        """Run the agent and post-process output to remove Unicode brackets.
+        
+        Implements FR-001 (Chat Interface), FR-003 (First-Person Persona), FR-008 (Output Normalization),
+        FR-012 (Tool Error Handling), NFR-001 (Sub-5s Response), NFR-003 (Structured Logging), NFR-004 (Unicode Normalization).
+        """
         # Log user input with session context
         session_prefix = f"[Session: {self.session_id[:8]}...] " if self.session_id else ""
         json_input = {"session_id": self.session_id, "user_input": user_input}
@@ -405,7 +428,10 @@ EXAMPLES OF INCORRECT get_file_contents USAGE (NEVER DO THIS):
         return cleaned_output
     
     async def cleanup(self):
-        """Cleanup MCP servers to prevent shutdown errors."""
+        """Cleanup MCP servers to prevent shutdown errors.
+        
+        Implements FR-012 (Tool Error Handling), NFR-005 (Session Isolation).
+        """
         if not self._mcp_servers:
             return
         
