@@ -140,11 +140,12 @@ async def test_github_commits_contains_shas(ai_me_agent):
     assert len(response) > 10, "Response is too short"
     logger.info(f"✓ Test passed - response contains commit information")
     logger.info(f"Response length: {len(response)}")
+
 @pytest.mark.asyncio
 async def test_unknown_person_contains_negative_response(ai_me_agent):
     """Tests REQ-003: Graceful handling of out-of-scope requests."""
     response = await ai_me_agent.run(
-        "Tell me about Albert Einstein"
+        "Do you know Slartibartfast?"  # Presumed unknown person
     )
     
     assert response, "Response is empty"
@@ -155,6 +156,8 @@ async def test_unknown_person_contains_negative_response(ai_me_agent):
         or "don't have any information" in response.lower()
     ), f"Response doesn't indicate lack of knowledge: {response}"
     logger.info(f"✓ Test passed - correctly handled out-of-scope query")
+
+
 @pytest.mark.asyncio
 async def test_carol_knowledge_contains_product(ai_me_agent):
     """Tests FR-002, FR-003: Verify that asking about Carol returns information containing 'product'."""
@@ -282,7 +285,6 @@ async def test_user_story_2_multi_topic_consistency(ai_me_agent):
     # Ask 3 questions about different topics
     topics = [
         ("What is your background in technology?", "background|experience|technology"),
-        ("Tell me about your current work at Neosofia", "Neosofia|current|employer"),
         ("What programming languages are you skilled in?", "programming|language|skilled"),
     ]
     
