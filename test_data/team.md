@@ -16,7 +16,6 @@
   - UI/UX design background
   - Contact: bob@example.com
 
-reorganize and conditionally build system prompt based on mcp servers. add seed for test reproducibility.
 ### Product Managers
 
 - **Carol Williams** - Product Owner
