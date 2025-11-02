@@ -14,10 +14,10 @@ from unittest.mock import AsyncMock, patch
 # Couple ideas to make them better:
 # - Improve app configuration to avoid directory and globbing gymnastics
 # - In the future we should run inference locally with docker-compose
-# - figure out how to make LLMs behave like humans by using "normal" utf8 symbols
 
-# Set temperature to 0 for deterministic test results
+# Set temperature to 0 and seed for deterministic test results
 os.environ["TEMPERATURE"] = "0"
+os.environ["SEED"] = "42"  # Fixed seed for reproducibility
 
 # Point our RAG to the test_data directory (project root)
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -108,6 +108,7 @@ async def ai_me_agent():
     )
     logger.info("Agent created successfully with MCP servers")
     logger.info(f"Temperature set to {config.temperature}")
+    logger.info(f"Seed set to {config.seed}")
     
     # Yield the agent for the test
     yield aime_agent

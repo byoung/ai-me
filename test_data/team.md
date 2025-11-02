@@ -7,6 +7,8 @@
 - **Ben Young** - Lead Software Engineer
   - Specializes in backend systems
   - Working on microservices architecture
+  - Programming languages: Python, Go, TypeScript, Rust, SQL
+  - Expertise in: async programming, distributed systems, cloud infrastructure
   - Contact: ben@example.com
 
 - **Bob Smith** - Frontend Developer
@@ -14,7 +16,7 @@
   - UI/UX design background
   - Contact: bob@example.com
 
-
+reorganize and conditionally build system prompt based on mcp servers. add seed for test reproducibility.
 ### Product Managers
 
 - **Carol Williams** - Product Owner

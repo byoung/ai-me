@@ -155,6 +155,9 @@ class Config(BaseSettings):
     temperature: float = Field(
         default=1.0,
         description="LLM temperature for sampling (0.0-2.0, default 1.0)")
+    seed: Optional[int] = Field(
+        default=None,
+        description="Random seed for deterministic outputs (optional, for testing)")
     github_repos: Union[str, List[str]] = Field(
         default="",
         description="GitHub repos to load (format: owner/repo), comma-separated in .env")
@@ -195,10 +198,14 @@ class Config(BaseSettings):
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
         
         # Initialize Groq client for LLM operations
+        default_query = {"temperature": self.temperature}
+        if self.seed is not None:
+            default_query["seed"] = self.seed
+        
         self.openai_client = AsyncOpenAI(
             base_url="https://api.groq.com/openai/v1",
             api_key=self.groq_api_key.get_secret_value(),
-            default_query={"temperature": self.temperature}
+            default_query=default_query
         )
         set_default_openai_client(self.openai_client)
         
