@@ -55,7 +55,8 @@ async def initialize_session(session_id: str) -> None:
     # Warmup: establish context and preload tools
     try:
         logger.info(f"[Session: {session_id[:8]}...] Running warmup...")
-        await session_agent.run("Please introduce yourself briefly - who you are and what your main expertise is.")
+        # Use a greeting that doesn't require tool calls or RAG retrieval
+        await session_agent.run("Hello!")
         logger.info(f"[Session: {session_id[:8]}...] Warmup complete!")
     except Exception as e:
         logger.info(f"[Session: {session_id[:8]}...] Warmup failed: {e}")

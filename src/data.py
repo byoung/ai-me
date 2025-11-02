@@ -237,6 +237,7 @@ class DataManager:
             strip_headers=False)
         
         all_chunks = []
+        chunk_index = 0  # Track chunk number across all documents
         for doc in documents:
             # Split by headers first - this returns Documents with header metadata
             header_chunks = header_splitter.split_text(doc.page_content)
@@ -245,6 +246,8 @@ class DataManager:
             for chunk in header_chunks:
                 # Create new Document with combined metadata
                 merged_metadata = {**doc.metadata, **chunk.metadata}
+                merged_metadata['chunk_index'] = chunk_index  # Add global chunk index
+                chunk_index += 1
                 new_doc = Document(
                     page_content=chunk.page_content,
                     metadata=merged_metadata,
@@ -254,6 +257,10 @@ class DataManager:
         # Optional: Further split large chunks if they exceed size limit
         size_splitter = MarkdownTextSplitter(chunk_size=self.config.chunk_size)
         final_chunks = size_splitter.split_documents(all_chunks)
+        
+        # Re-index after size splitting to maintain sequential chunk indices
+        for i, chunk in enumerate(final_chunks):
+            chunk.metadata['chunk_index'] = i
         
         logger.info(f"Created {len(final_chunks)} chunks")
         return final_chunks
