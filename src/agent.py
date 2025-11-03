@@ -75,8 +75,11 @@ WORKFLOW FOR EVERY MESSAGE:
 1. Call read_graph() immediately - retrieve all stored information
 2. Check if "user" entity exists in the returned knowledge graph
 3. If the user shares new information:
-   a) If "user" entity doesn't exist: create_entities(entities=[{"name":"user","entityType":"person","observations":["..."]}])
-   b) If "user" entity exists: add_observations(observations=[{"entityName":"user","contents":["..."]}])
+   a) If "user" entity doesn't exist: create_entities(
+       entities=[{"name":"user","entityType":"person",
+       "observations":["..."]}])
+   b) If "user" entity exists: add_observations(
+       observations=[{"entityName":"user","contents":["..."]}])
 4. If user asks about stored info: search read_graph results and respond
 
 TOOLS REFERENCE:
@@ -90,8 +93,12 @@ EXAMPLES:
 User says "My favorite color is blue":
 1. read_graph() ← Call with empty parentheses
 2. See if "user" entity exists
-3. If not: create_entities(entities=[{"name":"user","entityType":"person","observations":["favorite color is blue"]}])
-4. If yes: add_observations(observations=[{"entityName":"user","contents":["favorite color is blue"]}])
+3. If not: create_entities(
+     entities=[{"name":"user","entityType":"person",
+     "observations":["favorite color is blue"]}])
+4. If yes: add_observations(
+     observations=[{"entityName":"user",
+     "contents":["favorite color is blue"]}])
 5. Reply: "Got it, I'll remember that your favorite color is blue."
 
 User asks "What's my favorite color":
@@ -180,7 +187,8 @@ MANDATORY WORKFLOW:
 5. Include source references (file paths or document titles)
 
 TOOL USAGE:
-- get_local_info(query="Python programming languages skills") → retrieves all documents about my skills
+- get_local_info(query="Python programming languages skills") →
+  retrieves all documents about my skills
 - get_local_info(query="background experience") → retrieves background info
 - get_local_info(query="projects I've worked on") → retrieves project info
 
@@ -293,27 +301,8 @@ Response Format:
     
     @property
     def agent_prompt(self) -> str:
-        """Generate main agent prompt - simplified, delegates to specialized instructions."""
+        """Generate main agent prompt."""
         return f"""
-🚨🚨🚨 CRITICAL TOOL SCHEMA NOTICE 🚨🚨🚨
-
-SOME TOOLS TAKE NO PARAMETERS - THIS IS NOT A MISTAKE:
-The read_graph tool from the Memory server has an EMPTY parameter list.
-This means: DO NOT PASS ANY ARGUMENTS TO read_graph
-
-CORRECT WAYS TO CALL read_graph:
-- In tool_calls JSON: {{"name": "read_graph", "arguments": {{}}}}
-- The arguments must be an EMPTY JSON OBJECT: {{}}
-- NOT: {{"name": "read_graph", "arguments": {{"": {{}}}}}}
-- NOT: {{"name": "read_graph", "arguments": {{"data": null}}}}
-
-When the OpenAI API calls you with the read_graph tool available,
-ALWAYS call it as: {{"name": "read_graph", "arguments": {{}}}}
-
-END OF CRITICAL NOTICE
-
----
-
 You are acting as somebody who is personifying {self.bot_full_name}.
 Your primary role is to help users by answering questions about my knowledge,
 experience, and expertise in technology.
@@ -322,50 +311,40 @@ CRITICAL: You are NOT an all-knowing AI. You are personifying ME, {self.bot_full
 a specific person. You can ONLY answer based on MY documentation OR information about
 the USER stored in memory. Do NOT use your general LLM training data to answer questions.
 
-CRITICAL WORKFLOW - YOU MUST FOLLOW THIS FOR EVERY USER MESSAGE:
-1. MEMORY: If the user shares personal information OR asks you to recall something about THEM,
-   use the memory tools (read_graph, create_entities, add_observations) IMMEDIATELY.
-   Example: "My favorite color is blue" → store in memory
-   Example: "What's my favorite color?" → read from memory using read_graph
-2. KNOWLEDGE: If the user asks about ME - people I know, my experience, projects,
-   etc. - you MUST use get_local_info tool FIRST to check my documentation.
-   Example: "Do you know Carol?" → use get_local_info to check my docs
-   Example: "What's your experience?" → use get_local_info to check my docs
-3. If get_local_info returns no information about MY knowledge, say "I don't have any 
-   information about that" or "I'm not familiar with that." Do NOT use general LLM knowledge.
-4. Then formulate your response ONLY based on: (a) retrieved documentation about ME, or 
-   (b) memory about the USER.
+=== CRITICAL WORKFLOW FOR EVERY USER MESSAGE ===
 
-When interacting with the user follow these rules:
-- always refer to yourself as {self.bot_full_name} or "I".
-- When talking about a prior current or prior employer indicate the relationship
-  clearly. For example: Neosofia (my current employer) or Medidata (a prior
-  employer).
-- You should be personable, friendly, and professional in your responses.
-- MANDATORY: Check my documentation with get_local_info before answering any question
-  about my background, experience, or people I know.
-- Format file references as complete GitHub URLs with owner, repo, path, and
-  filename
-  - Example: https://github.com/owner/repo/blob/main/filename.md
-  - Never use shorthand like: filename.md†L44-L53 or source†L44-L53
-  - Always strip out line number references
-- CRITICAL: Include source citations in your response to establish credibility
-  and traceability. Format citations as:
-  - For GitHub sources: "Per my [document_name]..." or "As mentioned in [document_name]..."
-  - For local sources: "According to my documentation on [topic]..."
-  - Include the source URL in parentheses when available
+1. **USER PERSONAL INFO** (they share or ask about THEIR information):
+   - User says "My favorite color is..." → Use memory tools to store in knowledge graph
+   - User asks "What's my favorite color?" → Use memory tools to retrieve from knowledge graph
+   - Call read_graph() immediately, then create_entities/add_observations for new info
+
+2. **GITHUB/CODE QUERIES** (they ask about repositories, code, implementations):
+   - User asks "What's in repo X?" → Use GitHub search_code or get_file_contents tools
+   - User asks "Show me file Y" → Use get_file_contents to fetch content
+   - Use available GitHub tools to search and retrieve
+
+3. **YOUR BACKGROUND/KNOWLEDGE** (they ask about you, {self.bot_full_name}):
+   - User asks "What's your experience?" → Use get_local_info to retrieve documentation
+   - User asks "Do you know Carol?" → Use get_local_info to search knowledge base
+   - ALWAYS use get_local_info FIRST before saying you don't know something
+
+=== RESPONSE GUIDELINES ===
+
+When formulating responses:
+- Always refer to yourself as {self.bot_full_name} or "I"
+- When mentioning employers: "Neosofia (my current employer)" or "Medidata (a prior employer)"
+- Be personable, friendly, and professional
+- Format GitHub URLs as complete paths: https://github.com/owner/repo/blob/main/path/file.md
+- CRITICAL: Include source citations
   - Example: "Per my resume (https://github.com/byoung/ai-me/blob/main/resume.md), I worked at..."
-- Add reference links in a references section at the end of the output if they
-  match github.com
-
-You have access to specialized tools organized by capability. Below are detailed
-instructions for each capability.
+- Add reference links section at end if GitHub sources referenced
 """
     
     async def setup_mcp_servers(self, mcp_params_list: List[MCPServerParams]):
-        """Initialize and connect all MCP servers from provided parameters list.
+        """Initialize and connect all MCP servers from provided parameters.
         
-        Implements FR-009 (Mandatory Tools), FR-010 (Optional Tools), FR-012 (Tool Error Handling).
+        Implements FR-009 (Mandatory Tools), FR-010 (Optional Tools),
+        FR-012 (Tool Error Handling).
         """
         
         mcp_servers_local = []
@@ -447,28 +426,28 @@ instructions for each capability.
     ) -> Agent:
         """Create the main ai-me agent with organized instruction sections.
         
-        Implements FR-001 (Chat Interface), FR-003 (First-Person Persona), FR-009 (Mandatory Tools),
-        FR-010 (Optional Tools).
+        Implements FR-001 (Chat Interface), FR-003 (First-Person Persona),
+        FR-009 (Mandatory Tools), FR-010 (Optional Tools).
         
-        Architecture:
-        The agent prompt is now organized into sections that provide specialized
+        The agent prompt is organized into sections providing specialized
         instructions for different capabilities:
         - Main persona and response guidelines
-        - Memory management instructions (when Memory MCP is available)
-        - GitHub research instructions (when GitHub MCP is available)
-        - Knowledge base research instructions (always available via get_local_info)
+        - Memory management (when Memory MCP is available)
+        - GitHub research (when GitHub MCP is available)
+        - Knowledge base research (always available via get_local_info)
         - Time utilities (when Time MCP is available)
         
-        This maintains the same functionality but with clearer organization.
-
         Args:
-            agent_prompt: Optional prompt override. If None, builds a comprehensive
-                prompt from the organized sub-prompts based on available tools.
+            agent_prompt: Optional prompt override. If None, builds a
+                comprehensive prompt from organized sub-prompts based on
+                available tools.
             mcp_params: Optional list of MCP server parameters to initialize.
-                If None or empty, no MCP servers will be initialized. To use memory
-                functionality, caller must explicitly pass mcp_params including
-                get_mcp_memory_params(session_id) with a unique session_id.
+                If None or empty, no MCP servers will be initialized. To use
+                memory functionality, caller must explicitly pass mcp_params
+                including get_mcp_memory_params(session_id) with a unique
+                session_id.
             additional_tools: Optional list of additional tools to append.
+            
         Returns:
             An initialized Agent instance.
         """
@@ -492,22 +471,16 @@ instructions for each capability.
             prompt_sections.append("\n## Knowledge Base Research")
             prompt_sections.append(self.KB_RESEARCHER_PROMPT)
             
-            # Add Memory Agent instructions if memory server available
-            if has_memory:
-                prompt_sections.append("\n## Memory Management")
-                prompt_sections.append(self.MEMORY_AGENT_PROMPT)
-                logger.info("✓ Memory instructions added to agent prompt")
-            
-            # Add GitHub Researcher instructions if GitHub server available
-            if has_github:
-                prompt_sections.append("\n## GitHub Research")
-                prompt_sections.append(self.GITHUB_RESEARCHER_PROMPT)
-                logger.info("✓ GitHub instructions added to agent prompt")
+            # NOTE: Memory and GitHub agents are now sub-agents, not inline instructions
+            # (has_memory and has_github conditions removed - see handoffs section below)
             
             # Add Time utility note if time server available
             if has_time:
                 prompt_sections.append("\n## Time Information")
-                prompt_sections.append("You have access to time tools for getting current date/time information.")
+                prompt_sections.append(
+                    "You have access to time tools for getting current "
+                    "date/time information."
+                )
                 logger.info("✓ Time server available")
             
             prompt = "\n".join(prompt_sections)
@@ -525,7 +498,47 @@ instructions for each capability.
 
         logger.info(f"Creating ai-me agent with tools: {[tool.name for tool in tools]}")
 
-        # Create main agent with all MCP servers
+        # Separate GitHub and memory servers for sub-agent creation
+        github_mcp_servers = [s for s in mcp_servers if "github-mcp-server" in str(s)]
+        memory_mcp_servers = [s for s in mcp_servers if "server-memory" in str(s)]
+        time_mcp_servers = [s for s in mcp_servers if "mcp-server-time" in str(s)]
+        
+        # Create GitHub sub-agent if GitHub server is available
+        github_agent = None
+        if github_mcp_servers:
+            github_agent = Agent(
+                name="github-agent",
+                handoff_description=(
+                    "Handles GitHub research and code exploration"
+                ),
+                instructions=self.GITHUB_RESEARCHER_PROMPT,
+                tools=[],
+                mcp_servers=github_mcp_servers,
+                model=self.model,
+            )
+            logger.info(
+                f"✓ GitHub sub-agent created with "
+                f"{len(github_mcp_servers)} MCP server(s)"
+            )
+        
+        # Create Memory sub-agent if memory server is available
+        memory_agent = None
+        if memory_mcp_servers:
+            memory_agent = Agent(
+                name="memory-agent",
+                handoff_description="Handles memory management and knowledge graph operations",
+                instructions=self.MEMORY_AGENT_PROMPT,
+                tools=[],
+                mcp_servers=memory_mcp_servers,
+                model=self.model,
+            )
+            logger.info(
+                f"✓ Memory sub-agent created with "
+                f"{len(memory_mcp_servers)} MCP server(s)"
+            )
+        
+        # Create main agent with ALL MCP servers for direct execution
+        # Sub-agents have specialized prompts but access same tools for reliability
         agent_kwargs = {
             "model": self.model,
             "name": "ai-me",
@@ -533,10 +546,19 @@ instructions for each capability.
             "tools": tools,
         }
         
-        # Add all MCP servers if available
         if mcp_servers:
             agent_kwargs["mcp_servers"] = mcp_servers
             logger.info(f"✓ {len(mcp_servers)} MCP servers added to main agent")
+        
+        # Add both sub-agents as handoffs
+        handoffs = []
+        if github_agent:
+            handoffs.append(github_agent)
+        if memory_agent:
+            handoffs.append(memory_agent)
+        
+        if handoffs:
+            agent_kwargs["handoffs"] = handoffs
                 
         ai_me = Agent(**agent_kwargs)
 
@@ -561,8 +583,10 @@ instructions for each capability.
     async def run(self, user_input: str, **runner_kwargs) -> str:
         """Run the agent and post-process output to remove Unicode brackets.
         
-        Implements FR-001 (Chat Interface), FR-003 (First-Person Persona), FR-008 (Output Normalization),
-        FR-012 (Tool Error Handling), NFR-001 (Sub-5s Response), NFR-003 (Structured Logging), NFR-004 (Unicode Normalization).
+        Implements FR-001 (Chat Interface), FR-003 (First-Person Persona),
+        FR-008 (Output Normalization), FR-012 (Tool Error Handling),
+        NFR-001 (Sub-5s Response), NFR-003 (Structured Logging),
+        NFR-004 (Unicode Normalization).
         """
         # Log user input with session context
         session_prefix = f"[Session: {self.session_id[:8]}...] " if self.session_id else ""
