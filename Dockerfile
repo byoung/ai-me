@@ -22,11 +22,18 @@ RUN mkdir -p /app/bin \
 
 WORKDIR /app
 
-# Install project dependencies with uv
+# Copy only dependency specifications for layer caching
 COPY pyproject.toml uv.lock ./
-RUN uv sync
 
+# Create virtual environment and sync dependencies from lock file
+# --no-install-project defers building the local package until source is copied
+RUN uv venv && uv sync --locked --no-install-project
+
+# Now copy the complete source code
 COPY . /app
+
+# Sync again to install the local package (now that source is present)
+RUN uv sync --locked
 
 # Non-root user with access to /app
 RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app

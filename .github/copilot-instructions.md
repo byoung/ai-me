@@ -24,7 +24,9 @@ The constitution covers:
 
 - Run tests after refactoring: `uv run pytest tests/ -v`
 - Always update notebooks when changing function signatures
-- Use `uv` for all code execution (never `pip` directly)
+- Use `uv` for all code execution (never `pip` directly, never manually activate venv)
+- Use `uv run` to execute scripts and commands, never bare `python` or shell activation
+- **NEVER use `tail`, `head`, `grep`, or similar output filters** — show full output always so you can see everything that's happening
 - See `TESTING.md` for detailed test setup
 
 ## Common Gotchas & Reminders
