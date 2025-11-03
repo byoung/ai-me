@@ -37,12 +37,13 @@ The test suite (`tests/integration/spec-001.py`) automatically uses this directo
 os.environ["GITHUB_REPOS"] = ""  # Disable GitHub loading
 test_data_dir = os.path.join(project_root, "tests", "data")
 
-# DataManager initialization
-data_manager = DataManager(
+# DataManager initialization with required config
+config = DataManagerConfig(
     doc_load_local=["**/*.md"],
     github_repos=[],
     doc_root=test_data_dir  # Points to this directory
 )
+data_manager = DataManager(config=config)
 ```
 
 ## Test Cases

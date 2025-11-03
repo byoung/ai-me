@@ -38,6 +38,25 @@ uv run pytest tests/ -v -o log_cli=true --log-cli-level=INFO --capture=no
 uv run pytest tests/integration/spec-001.py::test_rear_knowledge_contains_it245 -v -o log_cli=true --log-cli-level=INFO --capture=no
 ```
 
+### Run Tests with Code Coverage
+
+```bash
+# Run tests with coverage report
+uv run pytest tests/ --cov=src --cov-report=term-missing -v
+
+# Generate HTML coverage report
+uv run pytest tests/ --cov=src --cov-report=html -v
+
+# View HTML report (opens in browser)
+open htmlcov/index.html
+
+# Integration tests only with coverage
+uv run pytest tests/integration/ --cov=src --cov-report=term-missing -v
+
+# Show only uncovered lines
+uv run pytest tests/ --cov=src --cov-report=term:skip-covered -v
+```
+
 ## Test Architecture
 
 ### Fixture: `ai_me_agent`

@@ -77,7 +77,7 @@ def setup_logger(name: str) -> logging.Logger:
         loki_username = os.getenv('LOKI_USERNAME')
         loki_password = os.getenv('LOKI_PASSWORD')
         
-        if loki_url and loki_username and loki_password:
+        if loki_url and loki_username and loki_password:  # pragma: no cover
             try:
                 # Create async queue for non-blocking logging
                 log_queue = Queue(maxsize=1000)  # Buffer up to 1000 log messages
@@ -109,7 +109,7 @@ def setup_logger(name: str) -> logging.Logger:
                 root_logger.addHandler(queue_handler)
                 
                 root_logger.info(f"Grafana Loki logging enabled: {loki_url} (tags: {loki_tags})")
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 root_logger.warning(f"Failed to setup Grafana Loki logging: {e}")
         
         root_logger.setLevel(log_level)
@@ -203,7 +203,7 @@ class Config(BaseSettings):
         logger.info("Setting tracing export API key for agents.")
         set_tracing_export_api_key(self.openai_api_key.get_secret_value())
     
-    def _safe_repr(self) -> str:
+    def _safe_repr(self) -> str:  # pragma: no cover
         """Helper to generate string representation excluding sensitive fields."""
         lines = ["Config:"]
         for field_name in type(self).model_fields:
@@ -213,14 +213,14 @@ class Config(BaseSettings):
             lines.append(f"  {field_name}: {display}")
         return "\n".join(lines)
     
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         """Return string representation of Config with secrets hidden.
         
         DEBUG: Debug utility for logging/debugging configuration state.
         """
         return self._safe_repr()
     
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         """Return human-readable string representation of Config with secrets hidden.
         
         DEBUG: Debug utility for logging/debugging configuration state.

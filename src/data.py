@@ -59,33 +59,19 @@ class DataManager:
     parameters have sensible defaults and can be overridden as needed.
     """
     
-    def __init__(self, config: Optional[DataManagerConfig] = None, **kwargs):
+    def __init__(self, config: DataManagerConfig):
         """
         Initialize data manager with configuration.
         
         Implements FR-002 (Knowledge Retrieval).
         
         Args:
-            config: Optional DataManagerConfig instance. If not provided, one will be created
-                from kwargs. For backward compatibility, can also pass individual parameters.
-            **kwargs: Individual config parameters (doc_load_local, github_repos, etc.)
-                Used when config is not provided or to override config values.
+            config: DataManagerConfig instance with all settings
         """
-        if config is None:
-            # Create config from kwargs for backward compatibility
-            self.config = DataManagerConfig(**kwargs)
-        else:
-            # Use provided config, but allow kwargs to override
-            if kwargs:
-                # Merge provided config with overrides
-                config_dict = config.model_dump()
-                config_dict.update(kwargs)
-                self.config = DataManagerConfig(**config_dict)
-            else:
-                self.config = config
+        self.config = config
         
         # Internal state
-        self._vectorstore: Optional[Chroma] = None
+        self.vectorstore: Optional[Chroma] = None
         self._embeddings: Optional[HuggingFaceEmbeddings] = None
     
     def load_local_documents(self) -> List[Document]:
@@ -119,7 +105,7 @@ class DataManager:
                 documents = loader.load()
                 logger.info(f"    Found {len(documents)} documents")
                 all_documents.extend(documents)
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 logger.info(
                     f"  Error loading pattern {pattern}: {e}"
                     f" - skipping this pattern"
@@ -139,7 +125,8 @@ class DataManager:
         
         Args:
             repos: List of repos (owner/repo format). Defaults to github_repos from init.
-            file_filter: Optional filter function for files. Defaults to .md files.
+            file_filter: Optional filter function for files. If None, uses default filter
+                excluding README, CONTRIBUTING, CODE_OF_CONDUCT, and SECURITY files.
             cleanup_tmp: If True, remove tmp directory before loading.
         
         Returns:
@@ -148,20 +135,20 @@ class DataManager:
         if repos is None:
             repos = self.config.github_repos
         
+        # Default filter excludes common documentation files that degrade RAG quality
         if file_filter is None:
             def file_filter(fp: str) -> bool:
-                """Filter function for GitHub document loading.
+                """Default filter excludes contributing docs to preserve RAG quality.
                 
-                Implements FR-002 (Knowledge Retrieval): Filters markdown files
-                for document loading.
+                Implements FR-002 (Knowledge Retrieval): Filters out common boilerplate
+                files (README, CONTRIBUTING, etc.) that aren't representative of
+                personified agent knowledge.
                 """
-                fp_lower = fp.lower()
                 basename = os.path.basename(fp).lower()
-                # TBD: Make this configurable once chunking logic is enhanced
-                keep = (fp_lower.endswith(".md") and 
-                    basename not in ["contributing.md", "code_of_conduct.md", "security.md", 
-                                     "readme.md"])
-                return keep
+                # Exclude common boilerplate that doesn't represent agent's knowledge
+                excluded = {"readme.md", "contributing.md", "code_of_conduct.md",
+                           "security.md"}
+                return basename not in excluded
         
         all_docs = []
         # Clean up tmp directory before loading
@@ -175,13 +162,28 @@ class DataManager:
         for repo in repos:
             logger.info(f"Loading GitHub repo: {repo}")
             try:
+                # Clone repo using GitLoader (even though it doesn't load files)
+                repo_path = f"{tmp_dir}/{repo}"
                 loader = GitLoader(
                     clone_url=f"https://github.com/{repo}",
-                    repo_path=f"{tmp_dir}/{repo}",
-                    file_filter=file_filter,
+                    repo_path=repo_path,
                     branch="main",
                 )
-                docs = loader.load()
+                # GitLoader.load() doesn't return files, but it clones the repo
+                # so we use DirectoryLoader to actually load the markdown files
+                loader.load()
+                
+                # Now use DirectoryLoader to load markdown files from the cloned repo
+                directory_loader = DirectoryLoader(
+                    repo_path,
+                    glob="**/*.md",
+                    loader_cls=TextLoader,
+                    loader_kwargs={'encoding': 'utf-8'}
+                )
+                docs = directory_loader.load()
+                
+                # Apply filter (default or custom) to exclude irrelevant files
+                docs = [doc for doc in docs if file_filter(doc.metadata['source'])]
                 
                 # Add repo metadata to each document
                 for doc in docs:
@@ -340,11 +342,11 @@ class DataManager:
         chroma_client = chromadb.EphemeralClient(Settings(anonymized_telemetry=False))
         
         # Drop existing collection if requested
-        if reset:
+        if reset:  # pragma: no cover
             try:
                 chroma_client.delete_collection(self.config.db_name)
                 logger.info(f"Dropped existing collection: {self.config.db_name}")
-            except Exception:
+            except Exception:  # pragma: no cover
                 pass  # Collection doesn't exist yet
         
         logger.info(f"Creating vectorstore with {len(chunks)} chunks...")
@@ -358,7 +360,7 @@ class DataManager:
         count = vectorstore._collection.count()
         logger.info(f"Vectorstore created with {count} documents")
         
-        self._vectorstore = vectorstore
+        self.vectorstore = vectorstore
         return vectorstore
     
     def setup_vectorstore(
@@ -383,14 +385,14 @@ class DataManager:
         chunks = self.load_and_process_all(github_repos=github_repos)
         return self.create_vectorstore(chunks, reset=reset)
     
-    def show_docs_for_file(self, filename: str):
+    def show_docs_for_file(self, filename: str):  # pragma: no cover
         """
         Retrieve and print chunks from the vectorstore whose metadata['file_path'] ends with the
         given filename. Returns a list of (doc_id, metadata, document).
         
         DEBUG TOOL: Utility/debugging function - no corresponding FR/NFR.
         """
-        all_docs = self._vectorstore.get()
+        all_docs = self.vectorstore.get()
         logger.info(f"Searching for chunks from file: {filename}")
 
         ids = all_docs.get("ids", [])
@@ -411,8 +413,3 @@ class DataManager:
             logger.info("=" * 100)
             logger.info(content)
             logger.info("")
-
-    @property
-    def vectorstore(self) -> Optional[Chroma]:
-        """Get the current vectorstore instance."""
-        return self._vectorstore

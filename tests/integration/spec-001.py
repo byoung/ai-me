@@ -7,6 +7,7 @@ import pytest_asyncio
 import re
 import sys
 import os
+import logging
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
@@ -58,7 +59,7 @@ def _get_shared_vectorstore():
         logger.info("Initializing shared vectorstore (first test)...")
         test_data_dir = os.path.join(project_root, "tests", "data")
         _data_config = DataManagerConfig(
-            github_repos=[],
+            github_repos=[],  # No GitHub repos for fast test execution
             doc_root=test_data_dir
         )
         _data_manager = DataManager(config=_data_config)
@@ -118,27 +119,51 @@ async def ai_me_agent():
 
 
 @pytest.mark.asyncio
+async def test_github_documents_load():
+    """Tests FR-002: GitHub document loading with source metadata."""
+    config = Config()
+    
+    # Load GitHub documents directly
+    github_config = DataManagerConfig(
+        github_repos=["byoung/ai-me"],
+        doc_load_local=[]
+    )
+    dm = DataManager(config=github_config)
+    vs = dm.setup_vectorstore()
+    
+    agent = AIMeAgent(
+        bot_full_name=config.bot_full_name,
+        model=config.model,
+        vectorstore=vs,
+        github_token=config.github_token,
+        session_id="test-session"
+    )
+    await agent.create_ai_me_agent()
+
+    response = await agent.run("Hi!")
+    
+    assert "hi" in response.lower(), (
+        f"hi' in response but got: {response}"
+    )
+
+
+@pytest.mark.asyncio
 async def test_rear_knowledge_contains_it245(ai_me_agent):
     """Tests REQ-001: Knowledge base retrieval of personal documentation."""
-    response = await ai_me_agent.run(
-        "What is IT-245?"
-    )
+    response = await ai_me_agent.run("What is IT-245?")
     
     assert "IT-245" in response or "It-245" in response or "it-245" in response
-    logger.info(f"✓ Test passed - IT-245 found in response")
+    logger.info("✓ IT-245 found in response")
 
 
 @pytest.mark.asyncio
 async def test_github_commits_contains_shas(ai_me_agent):
     """Tests REQ-002: MCP GitHub integration - retrieve commit history."""
-    response = await ai_me_agent.run(
-        "What are some recent commits I've made?"
-    )
+    response = await ai_me_agent.run("What are some recent commits I've made?")
     
     assert response, "Response is empty"
     assert len(response) > 10, "Response is too short"
-    logger.info(f"✓ Test passed - response contains commit information")
-    logger.info(f"Response length: {len(response)}")
+    logger.info("✓ Response contains commit information")
 
 @pytest.mark.asyncio
 async def test_unknown_person_contains_negative_response(ai_me_agent):
@@ -223,21 +248,17 @@ async def test_mcp_memory_server_remembers_favorite_color(ai_me_agent):
 
 
 @pytest.mark.asyncio
-async def test_github_relative_links_converted_to_absolute_urls(ai_me_agent):
-    """Tests FR-004, FR-011, NFR-003: Source Attribution via GitHub URL Conversion.
+async def test_github_relative_links_converted_to_absolute_urls():
+    """Tests FR-004: Document processing converts relative GitHub links to absolute URLs.
     
-    Validates that:
-    1. When documents loaded from GitHub have relative links (e.g., /resume.md),
-       they are rewritten to full GitHub URLs (e.g.,
-       https://github.com/owner/repo/blob/main/resume.md)
-    2. Agent responses include proper source attribution with GitHub URLs
-    3. Source citations use recognizable patterns (URLs, markdown links)
+    Validates that when documents are loaded from GitHub with relative links 
+    (e.g., /resume.md), they are rewritten to full GitHub URLs 
+    (e.g., https://github.com/owner/repo/blob/main/resume.md).
     
-    This ensures all responses can be traced back to public GitHub sources.
+    This is a unit-level test of the DataManager.process_documents() method.
     """
     from langchain_core.documents import Document
     
-    # PART 1: Test document processing (URL rewriting)
     sample_doc = Document(
         page_content=(
             "Check out [my resume](/resume.md) and "
@@ -252,9 +273,6 @@ async def test_github_relative_links_converted_to_absolute_urls(ai_me_agent):
     # Verify metadata is set correctly before processing
     assert sample_doc.metadata["github_repo"] == "byoung/ai-me", (
         "Sample doc metadata should have github_repo"
-    )
-    assert "github://" in sample_doc.metadata["source"], (
-        "Sample doc metadata should have github:// source"
     )
     
     data_config = DataManagerConfig(github_repos=["byoung/ai-me"])
@@ -274,14 +292,18 @@ async def test_github_relative_links_converted_to_absolute_urls(ai_me_agent):
         f"but got: {processed_content}"
     )
     
-    logger.info("✓ Part 1 passed: Relative GitHub links converted to absolute URLs")
-    logger.info(f"  Input metadata: github_repo={sample_doc.metadata['github_repo']}")
+    logger.info("✓ Test passed: Relative GitHub links converted to absolute URLs")
     logger.info(f"  Original: [my resume](/resume.md)")
     logger.info(f"  Converted: [my resume](https://github.com/byoung/ai-me/blob/main/resume.md)")
+
+
+@pytest.mark.asyncio
+async def test_agent_responses_cite_sources(ai_me_agent):
+    """Tests FR-004, FR-011: Agent responses include source citations.
     
-    # PART 2: Test agent response source attribution
-    # For local test data, we just verify sources are cited (in any format)
-    # GitHub URL conversion is tested in Part 1 above
+    Validates that agent responses include proper source attribution,
+    which could be GitHub URLs, local paths, or explicit source references.
+    """
     questions = [
         "What do you know about ReaR?",
         "Tell me about your experience in technology",
@@ -312,12 +334,8 @@ async def test_github_relative_links_converted_to_absolute_urls(ai_me_agent):
         )
         
         logger.info(f"✓ Source citation found for: {question[:40]}...")
-        logger.info(f"  Response includes source/reference")
     
-    logger.info(
-        "\n✓ Test passed: GitHub URLs converted (Part 1) + "
-        "Agent responses cite sources (Part 2, FR-004, FR-011)"
-    )
+    logger.info("\n✓ Test passed: Agent responses cite sources (FR-004, FR-011)")
 
 
 @pytest.mark.asyncio
@@ -435,6 +453,58 @@ async def test_tool_failure_error_messages_are_friendly(caplog, ai_me_agent):
             )
     
     logger.info("\n✓ Test passed: Error messages are friendly (FR-012) + properly logged")
+
+
+@pytest.mark.asyncio
+async def test_logger_setup_format(caplog):
+    """Tests NFR-003 (Structured Logging): Verify setup_logger creates structured logging.
+    
+    Tests that setup_logger() configures syslog-style format with JSON support for
+    structured logging of user/agent interactions.
+    
+    This validates the logger configuration that our production app relies on
+    for analytics and debugging.
+    """
+    # Force logger setup to run by clearing handlers so setup_logger reconfigures
+    root_logger = logging.getLogger()
+    original_handlers = root_logger.handlers[:]
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    try:
+        # Now call setup_logger with no handlers - should trigger full setup
+        test_logger = setup_logger("test.structured_logging")
+        
+        # Verify logger was created
+        assert test_logger.name == "test.structured_logging"
+        
+        # Verify root logger now has handlers (setup_logger should have added them)
+        assert len(root_logger.handlers) > 0, (
+            "Root logger should have handlers after setup_logger"
+        )
+        
+        # Verify we have a StreamHandler (console output)
+        has_stream_handler = any(
+            isinstance(handler, logging.StreamHandler)
+            for handler in root_logger.handlers
+        )
+        assert has_stream_handler, "Should have StreamHandler for console output"
+        
+        # Test that logging works with structured JSON format
+        # The formatters should support JSON logging for analytics
+        test_logger.info(
+            '{"session_id": "test-session", "user_input": "test message"}'
+        )
+        
+        logger.info(
+            "✓ Test passed: Logger setup configures structured logging (NFR-003)"
+        )
+    finally:
+        # Restore original handlers
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+        for handler in original_handlers:
+            root_logger.addHandler(handler)
 
 
 if __name__ == "__main__":

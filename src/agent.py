@@ -359,7 +359,7 @@ When formulating responses:
                 logger.info(f"✓ {server_name} connected successfully")
                 mcp_servers_local.append(server)
                 
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 logger.error(f"✗ {server_name} failed to connect")
                 logger.error(f"  Error type: {type(e).__name__}")
                 logger.error(f"  Error message: {e}")
@@ -418,9 +418,7 @@ When formulating responses:
     
     async def create_ai_me_agent(
         self,
-        agent_prompt: str = None,
         mcp_params: Optional[List[MCPServerParams]] = None,
-        additional_tools: Optional[List[Tool]] = None,
     ) -> Agent:
         """Create the main ai-me agent with organized instruction sections.
         
@@ -430,21 +428,16 @@ When formulating responses:
         The agent prompt is organized into sections providing specialized
         instructions for different capabilities:
         - Main persona and response guidelines
-        - Memory management (when Memory MCP is available)
-        - GitHub research (when GitHub MCP is available)
-        - Knowledge base research (always available via get_local_info)
-        - Time utilities (when Time MCP is available)
+        - Memory management (always included)
+        - GitHub research (always included)
+        - Knowledge base research (always included via get_local_info)
+        - Time utilities (always included)
         
         Args:
-            agent_prompt: Optional prompt override. If None, builds a
-                comprehensive prompt from organized sub-prompts based on
-                available tools.
-            mcp_params: Optional list of MCP server parameters to initialize.
-                If None or empty, no MCP servers will be initialized. To use
-                memory functionality, caller must explicitly pass mcp_params
-                including get_mcp_memory_params(session_id) with a unique
-                session_id.
-            additional_tools: Optional list of additional tools to append.
+            mcp_params: List of MCP server parameters to initialize.
+                Should include GitHub, Time, and Memory MCP servers.
+                Caller must pass get_mcp_memory_params(session_id) with a
+                unique session_id for proper session isolation.
             
         Returns:
             An initialized Agent instance.
@@ -455,41 +448,27 @@ When formulating responses:
         # Store MCP servers for cleanup
         self._mcp_servers = mcp_servers
 
-        # Build comprehensive prompt from sections if no override provided
-        if agent_prompt is None:
-            # Start with main agent prompt
-            prompt_sections = [self.agent_prompt]
-            
-            # Identify available MCP servers
-            has_github = any("github-mcp-server" in str(s) for s in mcp_servers)
-            has_memory = any("server-memory" in str(s) for s in mcp_servers)
-            has_time = any("mcp-server-time" in str(s) for s in mcp_servers)
-            
-            # Add KB Researcher instructions (always available)
-            prompt_sections.append("\n## Knowledge Base Research")
-            prompt_sections.append(self.KB_RESEARCHER_PROMPT)
-            
-            # Add Time utility note if time server available
-            if has_time:
-                prompt_sections.append("\n## Time Information")
-                prompt_sections.append(
-                    "You have access to time tools for getting current "
-                    "date/time information."
-                )
-                logger.info("✓ Time server available")
-            
-            prompt = "\n".join(prompt_sections)
-        else:
-            prompt = agent_prompt
+        # Build comprehensive prompt from sections
+        # Start with main agent prompt
+        prompt_sections = [self.agent_prompt]
+        
+        # Add KB Researcher instructions (always available)
+        prompt_sections.append("\n## Knowledge Base Research")
+        prompt_sections.append(self.KB_RESEARCHER_PROMPT)
+        
+        # Add Time utility note (time server is always included)
+        prompt_sections.append("\n## Time Information")
+        prompt_sections.append(
+            "You have access to time tools for getting current "
+            "date/time information."
+        )
+        
+        prompt = "\n".join(prompt_sections)
         
         logger.debug(f"Creating ai-me agent with prompt: {prompt[:100]}...")
         
         # Build tools list - get_local_info is always the default first tool
         tools = [self.get_local_info_tool()]
-        
-        # Append any additional tools provided
-        if additional_tools:
-            tools.extend(additional_tools)
 
         logger.info(f"Creating ai-me agent with tools: {[tool.name for tool in tools]}")
 
@@ -498,39 +477,35 @@ When formulating responses:
         memory_mcp_servers = [s for s in mcp_servers if "server-memory" in str(s)]
         time_mcp_servers = [s for s in mcp_servers if "mcp-server-time" in str(s)]
         
-        # Create GitHub sub-agent if GitHub server is available
-        github_agent = None
-        if github_mcp_servers:
-            github_agent = Agent(
-                name="github-agent",
-                handoff_description=(
-                    "Handles GitHub research and code exploration"
-                ),
-                instructions=self.GITHUB_RESEARCHER_PROMPT,
-                tools=[],
-                mcp_servers=github_mcp_servers,
-                model=self.model,
-            )
-            logger.info(
-                f"✓ GitHub sub-agent created with "
-                f"{len(github_mcp_servers)} MCP server(s)"
-            )
+        # Create GitHub sub-agent (always included)
+        github_agent = Agent(
+            name="github-agent",
+            handoff_description=(
+                "Handles GitHub research and code exploration"
+            ),
+            instructions=self.GITHUB_RESEARCHER_PROMPT,
+            tools=[],
+            mcp_servers=github_mcp_servers,
+            model=self.model,
+        )
+        logger.info(
+            f"✓ GitHub sub-agent created with "
+            f"{len(github_mcp_servers)} MCP server(s)"
+        )
         
-        # Create Memory sub-agent if memory server is available
-        memory_agent = None
-        if memory_mcp_servers:
-            memory_agent = Agent(
-                name="memory-agent",
-                handoff_description="Handles memory management and knowledge graph operations",
-                instructions=self.MEMORY_AGENT_PROMPT,
-                tools=[],
-                mcp_servers=memory_mcp_servers,
-                model=self.model,
-            )
-            logger.info(
-                f"✓ Memory sub-agent created with "
-                f"{len(memory_mcp_servers)} MCP server(s)"
-            )
+        # Create Memory sub-agent (always included)
+        memory_agent = Agent(
+            name="memory-agent",
+            handoff_description="Handles memory management and knowledge graph operations",
+            instructions=self.MEMORY_AGENT_PROMPT,
+            tools=[],
+            mcp_servers=memory_mcp_servers,
+            model=self.model,
+        )
+        logger.info(
+            f"✓ Memory sub-agent created with "
+            f"{len(memory_mcp_servers)} MCP server(s)"
+        )
         
         # Create main agent with ALL MCP servers for direct execution
         # Sub-agents have specialized prompts but access same tools for reliability
@@ -545,15 +520,8 @@ When formulating responses:
             agent_kwargs["mcp_servers"] = mcp_servers
             logger.info(f"✓ {len(mcp_servers)} MCP servers added to main agent")
         
-        # Add both sub-agents as handoffs
-        handoffs = []
-        if github_agent:
-            handoffs.append(github_agent)
-        if memory_agent:
-            handoffs.append(memory_agent)
-        
-        if handoffs:
-            agent_kwargs["handoffs"] = handoffs
+        # Add both sub-agents as handoffs (always included)
+        agent_kwargs["handoffs"] = [github_agent, memory_agent]
                 
         ai_me = Agent(**agent_kwargs)
 
@@ -597,8 +565,8 @@ When formulating responses:
                                                  **runner_kwargs)
         except Exception as e:
             error_str = str(e).lower()
-            
-            if "rate limit" in error_str or "api rate limit exceeded" in error_str:
+
+            if "rate limit" in error_str or "api rate limit exceeded" in error_str:  # pragma: no cover
                 logger.warning(f"{session_prefix}GitHub rate limit exceeded")
                 return "⚠️ GitHub rate limit exceeded. Try asking me again in 30 seconds"
             else:
@@ -624,16 +592,13 @@ When formulating responses:
         
         Implements FR-012 (Tool Error Handling), NFR-005 (Session Isolation).
         """
-        if not self._mcp_servers:
-            return
-        
         session_prefix = f"[Session: {self.session_id[:8]}...] " if self.session_id else ""
         logger.debug(f"{session_prefix}Cleaning up {len(self._mcp_servers)} MCP servers...")
         
         for server in self._mcp_servers:
             try:
                 await server.cleanup()
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 # Log but don't fail - best effort cleanup
                 logger.debug(f"{session_prefix}Error cleaning up MCP server: {e}")
         

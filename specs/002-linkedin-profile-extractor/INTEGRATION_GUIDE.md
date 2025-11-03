@@ -301,9 +301,10 @@ Only **publicly visible** LinkedIn data:
 **Solution**:
 ```bash
 # Test data loading
-python -c "from src.data import DataManager; 
-dm = DataManager(); 
-docs = dm.process_documents(); 
+python -c "from src.data import DataManager, DataManagerConfig; 
+config = DataManagerConfig(); 
+dm = DataManager(config=config); 
+docs = dm.load_local_documents(); 
 print(f'Loaded {len(docs)} documents')"
 ```
 
