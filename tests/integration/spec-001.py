@@ -24,15 +24,11 @@ test_data_dir = os.path.join(project_root, "tests", "data")
 os.environ["DOC_ROOT"] = test_data_dir
 os.environ["LOCAL_DOCS"] = "**/*.md"
 
-# Add src directory to path to allow imports
-src_dir = os.path.join(project_root, "src")
-sys.path.insert(0, src_dir)
-
 from config import setup_logger, Config
 from agent import AIMeAgent
+from data import DataManager, DataManagerConfig
 
 logger = setup_logger(__name__)
-from data import DataManager, DataManagerConfig
 
 # ============================================================================
 # SHARED CACHING - Initialize on first use, then reuse
@@ -47,7 +43,7 @@ def _get_shared_config():
     """Lazy initialization of shared config."""
     global _config
     if _config is None:
-        _config = Config()
+        _config = Config()  # type: ignore
         logger.info(f"Initialized shared config: {_config.bot_full_name}")
     return _config
 
@@ -59,7 +55,6 @@ def _get_shared_vectorstore():
         logger.info("Initializing shared vectorstore (first test)...")
         test_data_dir = os.path.join(project_root, "tests", "data")
         _data_config = DataManagerConfig(
-            github_repos=[],  # No GitHub repos for fast test execution
             doc_root=test_data_dir
         )
         _data_manager = DataManager(config=_data_config)
@@ -98,6 +93,7 @@ async def ai_me_agent():
     
     # Create the agent WITH MCP servers enabled
     logger.info("Creating ai-me agent with MCP servers...")
+    assert aime_agent.session_id is not None, "session_id should be set"
     await aime_agent.create_ai_me_agent(
         mcp_params=[
             aime_agent.mcp_github_params,
@@ -121,15 +117,14 @@ async def ai_me_agent():
 @pytest.mark.asyncio
 async def test_github_documents_load():
     """Tests FR-002: GitHub document loading with source metadata."""
-    config = Config()
+    config = Config()  # type: ignore
     
     # Load GitHub documents directly
     github_config = DataManagerConfig(
-        github_repos=["byoung/ai-me"],
         doc_load_local=[]
     )
     dm = DataManager(config=github_config)
-    vs = dm.setup_vectorstore()
+    vs = dm.setup_vectorstore(github_repos=["byoung/ai-me"])
     
     agent = AIMeAgent(
         bot_full_name=config.bot_full_name,
@@ -140,10 +135,10 @@ async def test_github_documents_load():
     )
     await agent.create_ai_me_agent()
 
-    response = await agent.run("Hi!")
+    response = await agent.run("Do you have python experience?")
     
-    assert "hi" in response.lower(), (
-        f"hi' in response but got: {response}"
+    assert "yes" in response.lower(), (
+        f"yes' in response but got: {response}"
     )
 
 
@@ -275,7 +270,7 @@ async def test_github_relative_links_converted_to_absolute_urls():
         "Sample doc metadata should have github_repo"
     )
     
-    data_config = DataManagerConfig(github_repos=["byoung/ai-me"])
+    data_config = DataManagerConfig()
     data_manager = DataManager(config=data_config)
     processed_docs = data_manager.process_documents([sample_doc])
     

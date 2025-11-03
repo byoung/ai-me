@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, computed_field, ConfigDict, SecretStr
 from agents import Agent, Tool, function_tool, Runner
 from agents.result import RunResult
 from agents.run import RunConfig
-from agents.mcp import MCPServerStdio
+from agents.mcp import MCPServerStdio, MCPServerStdioParams
 
 from config import setup_logger
 
@@ -354,7 +354,9 @@ When formulating responses:
                 logger.debug(f"Args: {params.args}")
                 logger.debug(f"Env vars: {list(params.env.keys()) if params.env else 'None'}")
 
-                server = MCPServerStdio(params.model_dump(), client_session_timeout_seconds=30)
+                # Construct a strongly-typed MCPServerStdioParams from the Pydantic model dict
+                server_params = MCPServerStdioParams(**params.model_dump())
+                server = MCPServerStdio(server_params, client_session_timeout_seconds=30)
                 await server.connect()
                 logger.info(f"✓ {server_name} connected successfully")
                 mcp_servers_local.append(server)
@@ -479,7 +481,7 @@ When formulating responses:
         
         # Create GitHub sub-agent (always included)
         github_agent = Agent(
-            name="github-agent",
+            name="github_agent",
             handoff_description=(
                 "Handles GitHub research and code exploration"
             ),
@@ -495,7 +497,7 @@ When formulating responses:
         
         # Create Memory sub-agent (always included)
         memory_agent = Agent(
-            name="memory-agent",
+            name="memory_agent",
             handoff_description="Handles memory management and knowledge graph operations",
             instructions=self.MEMORY_AGENT_PROMPT,
             tools=[],

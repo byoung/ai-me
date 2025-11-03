@@ -1,5 +1,5 @@
 import gradio
-from gradio import Request
+from gradio import Request, themes
 
 from config import Config, setup_logger
 from agent import AIMeAgent
@@ -7,14 +7,12 @@ from data import DataManager, DataManagerConfig
 
 logger = setup_logger(__name__)
 
-config = Config()
+config = Config() # type: ignore
 
 # Initialize data manager and vectorstore
-data_config = DataManagerConfig(
-    github_repos=config.github_repos
-)
+data_config = DataManagerConfig()
 data_manager = DataManager(config=data_config)
-vectorstore = data_manager.setup_vectorstore()
+vectorstore = data_manager.setup_vectorstore(github_repos=config.github_repos)  # type: ignore
 
 # Per-session agent storage (keyed by Gradio session_hash)
 # Each session gets its own AIMeAgent instance with session-specific MCP servers
@@ -68,6 +66,7 @@ async def get_session_status(request: Request):
     Implements FR-001 (Chat Interface), FR-007 (Session Isolation).
     """
     session_id = request.session_hash
+    assert session_id is not None, "session_hash should always be set by Gradio"
     if session_id not in session_agents:
         await initialize_session(session_id)
     return ""
@@ -79,6 +78,7 @@ async def chat(user_input: str, history, request: Request):
     Implements FR-001 (Chat Interface), FR-005 (Session History), FR-007 (Session Isolation).
     """
     session_id = request.session_hash
+    assert session_id is not None, "session_hash should always be set by Gradio"
     
     # Initialize agent for this session if not already done
     if session_id not in session_agents:
@@ -98,7 +98,7 @@ if __name__ == "__main__":
         custom_js = f.read()
     
     with gradio.Blocks(
-        theme=gradio.themes.Default(),
+        theme=themes.Default(),
         css=custom_css,
         fill_height=True,
         js=f"() => {{ {custom_js} }}"

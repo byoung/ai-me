@@ -27,9 +27,18 @@ jobs:
           -e OPENAI_API_KEY="${OPENAI_API_KEY}" \
           -e GROQ_API_KEY="${GROQ_API_KEY}" \
           -e GITHUB_PERSONAL_ACCESS_TOKEN="${GITHUB_PERSONAL_ACCESS_TOKEN}" \
+          -v "${{ github.workspace }}/htmlcov:/app/htmlcov" \
           --entrypoint uv \
           ai-me:test \
-          run pytest src/test.py -v -s
+          run pytest tests/ -v --cov=src --cov-report=html --cov-report=term-missing
+
+    - name: Upload coverage reports as artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report
+        path: htmlcov/
+        retention-days: 30
 
   deploy:
     needs: test

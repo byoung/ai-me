@@ -29,8 +29,6 @@ class DataManagerConfig(BaseModel):
     
     doc_load_local: List[str] = Field(
         default=["**/*.md"], description="Glob patterns for local docs (e.g., ['*.md'])")
-    github_repos: List[str] = Field(
-        default=[], description="List of GitHub repos (format: owner/repo)")
     doc_root: str = Field(
         default=(
             os.path.abspath(
@@ -115,8 +113,11 @@ class DataManager:
         logger.info(f"Loaded {len(all_documents)} total local documents.")
         return all_documents
     
-    def load_github_documents(self, repos: List[str] = None,
-        file_filter: Optional[Callable[[str], bool]] = None, cleanup_tmp: bool = True
+    def _load_github_documents(
+        self,
+        repos: Optional[List[str]] = None,
+        file_filter: Optional[Callable[[str], bool]] = None,
+        cleanup_tmp: bool = True
     ) -> List[Document]:
         """
         Load documents from GitHub repositories.
@@ -132,12 +133,10 @@ class DataManager:
         Returns:
             List of loaded documents from all repos.
         """
-        if repos is None:
-            repos = self.config.github_repos
         
         # Default filter excludes common documentation files that degrade RAG quality
         if file_filter is None:
-            def file_filter(fp: str) -> bool:
+            def default_file_filter(fp: str) -> bool:
                 """Default filter excludes contributing docs to preserve RAG quality.
                 
                 Implements FR-002 (Knowledge Retrieval): Filters out common boilerplate
@@ -149,6 +148,7 @@ class DataManager:
                 excluded = {"readme.md", "contributing.md", "code_of_conduct.md",
                            "security.md"}
                 return basename not in excluded
+            file_filter = default_file_filter
         
         all_docs = []
         # Clean up tmp directory before loading
@@ -158,8 +158,10 @@ class DataManager:
             logger.info(f"Cleaning up existing tmp directory: {tmp_dir}")
             shutil.rmtree(tmp_dir)
 
-        logger.info(f"Loading GitHub documents from {len(repos)} repos {repos}")
-        for repo in repos:
+        # Use provided repos or default to empty list if none specified
+        repos_to_load = repos if repos is not None else []
+        logger.info(f"Loading GitHub documents from {len(repos_to_load)} repos {repos_to_load}")
+        for repo in repos_to_load:
             logger.info(f"Loading GitHub repo: {repo}")
             try:
                 # Clone repo using GitLoader (even though it doesn't load files)
@@ -190,8 +192,8 @@ class DataManager:
                     doc.metadata["github_repo"] = repo
                 
                 logger.info(f"  Loaded {len(docs)} documents from {repo}")
-                all_docs.extend(docs)
-            except Exception as e:
+                all_docs.extend(docs) 
+            except Exception as e: # pragma: no cover
                 logger.info(f"  Error loading repo {repo}: {e} - skipping")
                 continue
         
@@ -278,7 +280,7 @@ class DataManager:
         logger.info(f"Created {len(final_chunks)} chunks")
         return final_chunks
     
-    def load_and_process_all(self, github_repos: List[str] = None) -> List[Document]:
+    def load_and_process_all(self, github_repos: Optional[List[str]] = None) -> List[Document]:
         """
         Load, process, and chunk all documents. Automatically loads local documents
         if doc_load_local is set, and GitHub documents if github_repos (or
@@ -299,10 +301,9 @@ class DataManager:
         if self.config.doc_load_local:
             all_docs.extend(self.load_local_documents())
         
-        # Load GitHub documents if repos are configured
-        repos_to_load = github_repos if github_repos is not None else self.config.github_repos
-        if repos_to_load:
-            all_docs.extend(self.load_github_documents(repos=repos_to_load))
+        # Load GitHub documents if repos are provided (github_repos must come from caller)
+        if github_repos:
+            all_docs.extend(self._load_github_documents(repos=github_repos))
         
         processed_docs = self.process_documents(all_docs)
         chunks = self.chunk_documents(processed_docs)
@@ -364,7 +365,7 @@ class DataManager:
         return vectorstore
     
     def setup_vectorstore(
-        self, github_repos: List[str] = None, reset: bool = True
+        self, github_repos: Optional[List[str]] = None, reset: bool = True
     ) -> Chroma:
         """
         Complete pipeline: load, process, chunk, and create vectorstore. Automatically
@@ -392,6 +393,12 @@ class DataManager:
         
         DEBUG TOOL: Utility/debugging function - no corresponding FR/NFR.
         """
+        if self.vectorstore is None:
+            logger.warning(
+                "Vectorstore not initialized. Call setup_vectorstore() first."
+            )
+            return []
+        
         all_docs = self.vectorstore.get()
         logger.info(f"Searching for chunks from file: {filename}")
 
@@ -413,3 +420,5 @@ class DataManager:
             logger.info("=" * 100)
             logger.info(content)
             logger.info("")
+        
+        return matched
