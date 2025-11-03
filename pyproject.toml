@@ -35,3 +35,9 @@ dev = [
     "pytest~=8.0",
     "pytest-asyncio~=0.24",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py", "spec-*.py"]
+python_classes = ["Test*", "*Tests"]
+python_functions = ["test_*"]

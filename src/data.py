@@ -3,7 +3,10 @@ Document loading, processing, and vectorstore management for ai-me application. 
 from local directories and GitHub repositories, chunking, and creating ChromaDB vector stores.
 """
 import os
+import re
+import shutil
 from typing import List, Optional, Callable
+
 from pydantic import BaseModel, Field
 from langchain_community.document_loaders import (
     DirectoryLoader,
@@ -16,8 +19,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 import chromadb
 from chromadb.config import Settings
-import shutil
-import re
+
 from config import setup_logger
 
 logger = setup_logger(__name__)

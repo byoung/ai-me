@@ -1,8 +1,9 @@
+import gradio
+from gradio import Request
+
 from config import Config, setup_logger
 from agent import AIMeAgent
 from data import DataManager, DataManagerConfig
-import gradio
-from gradio import Request
 
 logger = setup_logger(__name__)
 
@@ -39,8 +40,7 @@ async def initialize_session(session_id: str) -> None:
         session_id=session_id  # Pass session_id for logging context
     )
     
-    # TBD: make this prompt more generic by removing byoung/Neosofia specific
-    # references. The instructions are verbose because search_code tool is complex.
+    # Initialize agent with MCP servers for GitHub, Time, and Memory tools
     await session_agent.create_ai_me_agent(
         mcp_params=[
             session_agent.mcp_github_params,

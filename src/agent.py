@@ -3,6 +3,8 @@ Agent configuration and MCP server setup.
 Handles agent-specific configuration like MCP servers and prompts.
 """
 import json
+import os
+import tempfile
 import traceback
 from typing import List, Dict, Any, Optional, ClassVar
 
@@ -11,8 +13,9 @@ from agents import Agent, Tool, function_tool, Runner
 from agents.result import RunResult
 from agents.run import RunConfig
 from agents.mcp import MCPServerStdio
+
 from config import setup_logger
- 
+
 logger = setup_logger(__name__)
 
 # Unicode normalization translation table - built once, reused for all responses
@@ -232,8 +235,6 @@ Response Format:
         The official version supports --toolsets and --read-only flags.
         We use read-only mode with a limited toolset for safety.
         """
-        import os
-
         # Use local binary for testing, production path in Docker
         test_binary = "/tmp/test-github-mcp/github-mcp-server"
         prod_binary = "/app/bin/github-mcp-server"
@@ -285,9 +286,6 @@ Response Format:
         Returns:
             MCPServerParams configured with session-specific memory file
         """
-        import tempfile
-        import os
-        
         # Create session-specific memory file in temp directory
         temp_dir = tempfile.gettempdir()
         memory_file = os.path.join(temp_dir, f"mcp_memory_{session_id}.json")
@@ -470,9 +468,6 @@ When formulating responses:
             # Add KB Researcher instructions (always available)
             prompt_sections.append("\n## Knowledge Base Research")
             prompt_sections.append(self.KB_RESEARCHER_PROMPT)
-            
-            # NOTE: Memory and GitHub agents are now sub-agents, not inline instructions
-            # (has_memory and has_github conditions removed - see handoffs section below)
             
             # Add Time utility note if time server available
             if has_time:

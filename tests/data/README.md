@@ -30,12 +30,12 @@ These markdown files provide known content for deterministic testing of:
 
 ## Usage in Tests
 
-The test suite (`src/test.py`) automatically uses this directory:
+The test suite (`tests/integration/spec-001.py`) automatically uses this directory:
 
 ```python
-# Configuration in src/test.py
+# Configuration in tests/integration/spec-001.py
 os.environ["GITHUB_REPOS"] = ""  # Disable GitHub loading
-test_data_dir = os.path.join(project_root, "test_data")
+test_data_dir = os.path.join(project_root, "tests", "data")
 
 # DataManager initialization
 data_manager = DataManager(
@@ -116,11 +116,11 @@ To add new test content:
 
 1. **Create markdown file** in this directory:
    ```bash
-   touch test_data/my_topic.md
+   touch tests/data/my_topic.md
    # Add relevant content with known facts
    ```
 
-2. **Add test case** in `src/test.py`:
+2. **Add test case** in `tests/integration/spec-001.py`:
    ```python
    @pytest.mark.asyncio
    async def test_my_topic_knowledge(ai_me_agent):
@@ -133,7 +133,7 @@ To add new test content:
 
 4. **Verify** chunks created:
    ```bash
-   uv run pytest src/test.py -v -s | grep "Created.*chunks"
+   uv run pytest tests/ -v -s | grep "Created.*chunks"
    ```
 
 ## Maintenance Guidelines
@@ -157,7 +157,7 @@ To add new test content:
 ## Troubleshooting
 
 ### "Vectorstore setup complete with 0 documents"
-**Cause**: Files not loading from test_data directory
+**Cause**: Files not loading from tests/data directory
 
 **Fix**: Verify `doc_root` parameter and file patterns
 
@@ -167,7 +167,7 @@ To add new test content:
 **Fix**: Test already handles both variants, check for other formatting
 
 ### Test execution is slow (> 30 seconds)
-**Cause**: May be loading from GitHub instead of test_data
+**Cause**: May be loading from GitHub instead of tests/data
 
 **Fix**: Verify `GITHUB_REPOS=""` in test environment setup
 

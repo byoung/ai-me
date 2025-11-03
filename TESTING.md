@@ -2,7 +2,7 @@
 
 ## Overview
 
-The test suite (`src/test.py`) validates the ai-me agent system including:
+The test suite (`tests/integration/spec-001.py`) validates the ai-me agent system including:
 - Vectorstore setup and document loading
 - Agent configuration and initialization
 - RAG (Retrieval Augmented Generation) functionality
@@ -29,13 +29,13 @@ The test suite (`src/test.py`) validates the ai-me agent system including:
 From project root:
 ```bash
 # All tests
-uv run pytest src/test.py -v
+uv run pytest tests/ -v
 
 # With detailed output
-uv run pytest src/test.py -v -o log_cli=true --log-cli-level=INFO --capture=no
+uv run pytest tests/ -v -o log_cli=true --log-cli-level=INFO --capture=no
 
 # Specific test
-uv run pytest src/test.py::test_rear_knowledge_contains_it245 -v -o log_cli=true --log-cli-level=INFO --capture=no
+uv run pytest tests/integration/spec-001.py::test_rear_knowledge_contains_it245 -v -o log_cli=true --log-cli-level=INFO --capture=no
 ```
 
 ## Test Architecture
@@ -49,7 +49,7 @@ uv run pytest src/test.py::test_rear_knowledge_contains_it245 -v -o log_cli=true
 **Configuration**:
 - **Temperature**: Set to 0.0 for deterministic, reproducible responses
 - **Model**: Uses model specified in config (default: `openai/openai/gpt-oss-120b` via Groq)
-- **Data Source**: `test_data/` directory (configured via `doc_root` parameter)
+- **Data Source**: `tests/data/` directory (configured via `doc_root` parameter)
 - **GitHub Repos**: Disabled (`GITHUB_REPOS=""`) for faster test execution
 
 The temperature of 0 ensures that the agent's responses are consistent across test runs, making assertions more reliable.

@@ -2,12 +2,12 @@
 Configuration management for ai-me application.
 Centralizes environment variables, API clients, and application defaults.
 """
-import os
 import logging
+import os
 import socket
-from typing import Optional, List, Union
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
+from typing import Optional, List, Union
 
 from pydantic import Field, field_validator, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -111,16 +111,6 @@ def setup_logger(name: str) -> logging.Logger:
                 root_logger.info(f"Grafana Loki logging enabled: {loki_url} (tags: {loki_tags})")
             except Exception as e:
                 root_logger.warning(f"Failed to setup Grafana Loki logging: {e}")
-        else:
-            missing = []
-            if not loki_url:
-                missing.append("LOKI_URL")
-            if not loki_username:
-                missing.append("LOKI_USERNAME")
-            if not loki_password:
-                missing.append("LOKI_PASSWORD")
-            if missing:
-                root_logger.info(f"Loki logging disabled (missing: {', '.join(missing)})")
         
         root_logger.setLevel(log_level)
     

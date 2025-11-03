@@ -22,7 +22,7 @@ The constitution covers:
 
 ## Quick Development Checklist
 
-- Run tests after refactoring: `uv run pytest src/test.py -v`
+- Run tests after refactoring: `uv run pytest tests/ -v`
 - Always update notebooks when changing function signatures
 - Use `uv` for all code execution (never `pip` directly)
 - See `TESTING.md` for detailed test setup

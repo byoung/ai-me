@@ -11,23 +11,21 @@ from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 # Something about these tests makes me feel yucky. Big, brittle, and slow. BBS?
-# Couple ideas to make them better:
-# - Improve app configuration to avoid directory and globbing gymnastics
-# - In the future we should run inference locally with docker-compose
+# In the future we should run inference locally with docker-compose models.
 
-# Set temperature to 0 and seed for deterministic test results
+# Set temperature and seed for deterministic test results
 os.environ["TEMPERATURE"] = "0"
-os.environ["SEED"] = "42"  # Fixed seed for reproducibility
+os.environ["SEED"] = "42"
 
-# Point our RAG to the test_data directory (project root)
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-test_data_dir = os.path.join(project_root, "test_data")
+# Point our RAG to the tests/data directory
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+test_data_dir = os.path.join(project_root, "tests", "data")
 os.environ["DOC_ROOT"] = test_data_dir
 os.environ["LOCAL_DOCS"] = "**/*.md"
 
-
 # Add src directory to path to allow imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+src_dir = os.path.join(project_root, "src")
+sys.path.insert(0, src_dir)
 
 from config import setup_logger, Config
 from agent import AIMeAgent
@@ -58,7 +56,7 @@ def _get_shared_vectorstore():
     global _vectorstore, _data_manager
     if _vectorstore is None:
         logger.info("Initializing shared vectorstore (first test)...")
-        test_data_dir = os.path.join(project_root, "test_data")
+        test_data_dir = os.path.join(project_root, "tests", "data")
         _data_config = DataManagerConfig(
             github_repos=[],
             doc_root=test_data_dir

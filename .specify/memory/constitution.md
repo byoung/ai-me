@@ -104,7 +104,7 @@ All software must maintain complete traceability between requirements, implement
 2. **Local Development**:
    - Use `docs/` directory for markdown (won't deploy unless pushed to GitHub repo)
    - Test locally: `uv run src/app.py` (Gradio on port 7860)
-   - Run tests: `uv run pytest src/test.py -v`
+   - Run tests: `uv run pytest tests/ -v`
    - Edit notebooks then validate changes don't break tests
 
 3. **Docker/Notebook Development**:
@@ -123,10 +123,10 @@ All software must maintain complete traceability between requirements, implement
 - `src/data.py` - DataManager class, complete document pipeline
 - `src/agent.py` - AIMeAgent class, MCP setup, agent creation
 - `src/app.py` - Gradio interface, session management
-- `src/test.py` - Integration tests with pytest-asyncio
 - `src/notebooks/experiments.ipynb` - Development sandbox (test all APIs here first)
+- `tests/integration/spec-001.py` - Integration tests for spec 001 (personified AI agent)
+- `tests/data/` - Test fixtures and sample data
 - `docs/` - Local markdown for RAG development
-- `test_data/` - Test fixtures and sample data
 - `.github/copilot-instructions.md` - Detailed AI assistant guidance
 - `.specify/` - Spec-Driven Development templates and memory
 
