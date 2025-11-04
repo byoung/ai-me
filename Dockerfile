@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright:v1.55.0-noble AS builder
+FROM mcr.microsoft.com/playwright:v1.55.0-noble
 
 # Python runtime behavior
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -6,6 +6,10 @@ ENV PYTHONUNBUFFERED=1
 ENV PATH="/root/.local/bin:$PATH"
 # uv link mode: use copy instead of hardlinks (Docker volumes often don't support hardlinks)
 ENV UV_LINK_MODE=copy
+# Force CPU-only PyTorch (huge space savings - excludes CUDA libs)
+ENV TORCH_DEVICE=cpu
+ENV NO_CUDA=1
+ENV CUDA_VISIBLE_DEVICES=""
 
 # Install uv, Python, git, and Node.js (for Memory MCP server via npx)
 RUN apt-get update \
@@ -38,48 +42,18 @@ COPY . /app
 # Sync again to install the local package (now that source is present)
 RUN uv sync --locked
 
-# Clean up Python cache files to reduce image size
+# Clean up Python cache to reduce layer size
 RUN find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
-    find /app/.venv -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true && \
     find /app/.venv -type f -name "*.pyc" -delete && \
     find /app/.venv -type f -name "*.pyo" -delete && \
     rm -rf /root/.cache && \
-    # Remove test files and docs from dependencies to save space
-    find /app/.venv -type d -name tests -exec rm -rf {} + 2>/dev/null || true && \
-    find /app/.venv -type d -name docs -exec rm -rf {} + 2>/dev/null || true && \
-    # Remove NVIDIA CUDA libraries (not needed for inference, huge space waste)
-    find /app/.venv -type d -path "*nvidia*" -exec rm -rf {} + 2>/dev/null || true
+    # Remove NVIDIA CUDA libraries from site-packages only (not the namespace)
+    find /app/.venv/lib/*/site-packages/nvidia -type d 2>/dev/null -exec rm -rf {} + 2>/dev/null || true && \
+    # Remove test directories from dependencies (not needed at runtime)
+    find /app/.venv/lib/*/site-packages -maxdepth 2 -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
 
-# ============================================================================
-# Production image - minimal footprint
-# ============================================================================
-FROM mcr.microsoft.com/playwright:v1.55.0-noble
-
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PATH="/root/.local/bin:$PATH"
-# uv link mode: use copy instead of hardlinks (Docker volumes often don't support hardlinks)
-ENV UV_LINK_MODE=copy
-
-# Install only runtime dependencies (no dev tools)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git python3.12 python3.12-venv curl \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/* \
-    && npm cache clean --force
-
-# Create non-root user BEFORE copying files (automatic ownership)
-RUN adduser -u 5678 --disabled-password --gecos "" appuser
-
-WORKDIR /app
-
-# Copy files as the target user (automatic ownership, no chown needed)
-COPY --chown=appuser:appuser --from=builder /app/bin /app/bin
-COPY --chown=appuser:appuser --from=builder /app/.venv /app/.venv
-COPY --chown=appuser:appuser . /app
-
+# Non-root user with access to /app
+RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
 USER appuser
 
 # ENTRYPOINT ensures uv is always the executor (mandatory)

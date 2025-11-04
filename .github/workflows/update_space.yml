@@ -14,19 +14,10 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Free disk space (step 1 - hosted toolcache)
+    - name: Free disk space (hosted toolcache)
       run: rm -rf /opt/hostedtoolcache
 
-    - name: Free disk space (step 2 - apt cache)
-      run: sudo apt-get clean && sudo apt-get autoclean && sudo apt-get autoremove -y
-
-    - name: Free disk space (step 3 - docker images)
-      run: docker image prune -af --filter "until=24h"
-
-    - name: Check disk space (before build)
-      run: df -h
-
-    - name: Run tests in Docker Compose
+    - name: Run unit + integration tests in Docker
       env:
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         GITHUB_PERSONAL_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
