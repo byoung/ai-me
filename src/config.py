@@ -202,9 +202,12 @@ class Config(BaseSettings):
         )
         set_default_openai_client(self.openai_client)
         
-        # Set tracing API key AFTER setting default client
-        logger.info("Setting tracing export API key for agents.")
-        set_tracing_export_api_key(self.openai_api_key.get_secret_value())
+        # Set tracing API key AFTER setting default client (if provided)
+        if self.openai_api_key:
+            logger.info("Setting tracing export API key for agents.")
+            set_tracing_export_api_key(self.openai_api_key.get_secret_value())
+        else:
+            logger.info("No OpenAI API key provided, tracing disabled.")
     
     def _safe_repr(self) -> str:  # pragma: no cover
         """Helper to generate string representation excluding sensitive fields."""
