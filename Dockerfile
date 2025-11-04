@@ -4,7 +4,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies: git (for GitPython) and Node.js (for MCP servers via npx)
+# Install system dependencies: git (for GitPython) and Node.js (for Memory MCP server via npx)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl gnupg git git-lfs \
     && install -m 0755 -d /etc/apt/keyrings \
@@ -12,7 +12,8 @@ RUN apt-get update \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && npm cache clean --force
 
 # Install Playwright system dependencies for headless browser automation
 RUN apt-get update \
@@ -44,8 +45,9 @@ COPY . /app
 # Sync again to install the local package (now that source is present)
 RUN uv sync --locked
 
-# Install Playwright browsers for E2E tests
-RUN uv run playwright install chromium
+# Install Playwright browsers for E2E tests and clean up cache
+RUN uv run playwright install chromium && \
+    rm -rf /root/.cache/ms-playwright* /tmp/playwright* ~/.cache/pip
 
 # Non-root user with access to /app
 RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
