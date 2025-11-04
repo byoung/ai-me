@@ -124,11 +124,11 @@ class Config(BaseSettings):
     """Central configuration class for ai-me application with Pydantic validation."""
     
     # Environment Variables (from .env) - Required
-    # Note: These have no defaults, so they MUST be in .env or will raise ValidationError
-    # We don't provide defaults here because Pydantic will raise an error at runtime
-    # if they're missing from the environment, which is the intended behavior.
-    openai_api_key: SecretStr = Field(..., 
-        description="OpenAI API key for tracing")
+    # Note: openai_api_key is only used for tracing (optional)
+    # groq_api_key is required for LLM inference
+    openai_api_key: Optional[SecretStr] = Field(
+        default=None,
+        description="OpenAI API key for tracing (optional)")
     groq_api_key: SecretStr = Field(..., 
         description="Groq API key for inference")
     github_token: Optional[SecretStr] = Field(
