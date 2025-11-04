@@ -36,9 +36,12 @@ dependencies = [
 dev = [
     "ipykernel~=6.30",
     "ipywidgets~=8.1",
+    "playwright~=1.48",
     "pytest~=8.0",
     "pytest-asyncio~=0.24",
     "pytest-cov~=6.0",
+    "pytest-playwright~=0.5",
+    "pytest-xdist~=3.6",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -53,14 +56,21 @@ python_files = ["test_*.py", "*_test.py", "spec-*.py"]
 python_classes = ["Test*", "*Tests"]
 python_functions = ["test_*"]
 pythonpath = ["src"]
+asyncio_mode = "auto"
+# By default, exclude E2E tests (which use Playwright and manage their own event loops).
+# E2E tests run separately to avoid asyncio conflicts with async integration tests.
+# Run E2E: uv run pytest tests/e2e/ -v
+addopts = "--ignore=tests/e2e"
 
 [tool.coverage.run]
 source = ["src"]
+branch = true
 omit = [
     "*/tests/*",
     "*/test_*",
     "*/__pycache__/*",
     "*/notebooks/*",
+    "src/app.py",  # E2E coverage not testable without proper coverage framework
 ]
 
 [tool.coverage.report]

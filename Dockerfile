@@ -14,6 +14,15 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Playwright system dependencies for headless browser automation
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
+        libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
+        libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libpangocairo-1.0-0 \
+        libxshmfence1 libxkbcommon-x11-0 libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Download official GitHub MCP server binary
 RUN mkdir -p /app/bin \
     && curl -L https://github.com/github/github-mcp-server/releases/download/v0.19.0/github-mcp-server_Linux_x86_64.tar.gz \
@@ -35,8 +44,14 @@ COPY . /app
 # Sync again to install the local package (now that source is present)
 RUN uv sync --locked
 
+# Install Playwright browsers for E2E tests
+RUN uv run playwright install chromium
+
 # Non-root user with access to /app
 RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
 USER appuser
 
-ENTRYPOINT ["uv", "run", "src/app.py"]
+# ENTRYPOINT ensures uv is always the executor (mandatory)
+# CMD provides the default argument (can be overridden)
+ENTRYPOINT ["uv", "run"]
+CMD ["src/app.py"]

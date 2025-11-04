@@ -1,3 +1,5 @@
+import os
+
 import gradio
 from gradio import Request, themes
 
@@ -129,4 +131,6 @@ if __name__ == "__main__":
             # Initialize session when page loads
             ui.load(get_session_status, inputs=[], outputs=[session_init])
 
-    ui.launch(server_name="0.0.0.0", server_port=7860, show_api=False)
+    # Read port from environment variable for E2E tests, default to 7860
+    server_port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
+    ui.launch(server_name="0.0.0.0", server_port=server_port, show_api=False)

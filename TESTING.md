@@ -1,22 +1,14 @@
-# Integration Tests
+# Testing Guide
 
-## Overview
-
-The test suite (`tests/integration/spec-001.py`) validates the ai-me agent system including:
-- Vectorstore setup and document loading
-- Agent configuration and initialization
-- RAG (Retrieval Augmented Generation) functionality
-- Basic agent response quality and accuracy
-
-## Running Tests
+## Quick Start
 
 ### Prerequisites
 
-1. Ensure environment variables are set in `.env` file at project root:
+1. Set environment variables in `.env`:
    ```bash
-   OPENAI_API_KEY=<your-openai-key>     # For tracing
-   GROQ_API_KEY=<your-groq-key>         # For LLM inference
-   GITHUB_PERSONAL_ACCESS_TOKEN=<token> # For GitHub integration (optional for tests)
+   OPENAI_API_KEY=<your-key>
+   GROQ_API_KEY=<your-key>
+   GITHUB_PERSONAL_ACCESS_TOKEN=<token>  # optional
    ```
 
 2. Install dependencies:
@@ -24,81 +16,141 @@ The test suite (`tests/integration/spec-001.py`) validates the ai-me agent syste
    uv sync
    ```
 
-### Run All Tests
-
-From project root:
-```bash
-# All tests
-uv run pytest tests/ -v
-
-# With detailed output
-uv run pytest tests/ -v -o log_cli=true --log-cli-level=INFO --capture=no
-
-# Specific test
-uv run pytest tests/integration/spec-001.py::test_rear_knowledge_contains_it245 -v -o log_cli=true --log-cli-level=INFO --capture=no
-```
-
-### Run Tests with Code Coverage
-
-```bash
-# Run tests with coverage report
-uv run pytest tests/ --cov=src --cov-report=term-missing -v
-
-# Generate HTML coverage report
-uv run pytest tests/ --cov=src --cov-report=html -v
-
-# View HTML report (opens in browser)
-open htmlcov/index.html
-
-# Integration tests only with coverage
-uv run pytest tests/integration/ --cov=src --cov-report=term-missing -v
-
-# Show only uncovered lines
-uv run pytest tests/ --cov=src --cov-report=term:skip-covered -v
-```
-
-## Test Architecture
-
-### Fixture: `ai_me_agent`
-
-**Scope**: Module (shared across all tests in the file)
-
-**Purpose**: Creates a single agent instance that is reused across all tests to avoid expensive reinitialization.
-
-**Configuration**:
-- **Temperature**: Set to 0.0 for deterministic, reproducible responses
-- **Model**: Uses model specified in config (default: `openai/openai/gpt-oss-120b` via Groq)
-- **Data Source**: `tests/data/` directory (configured via `doc_root` parameter)
-- **GitHub Repos**: Disabled (`GITHUB_REPOS=""`) for faster test execution
-
-The temperature of 0 ensures that the agent's responses are consistent across test runs, making assertions more reliable.
-
-## Session Isolation Testing (Manual)
-
-**Note on Concurrency Testing**: Rather than implement brittle pytest-based concurrency tests, session isolation (SC-006) is verified through **manual browser-based testing**:
-
-### Steps to Manually Test Session Isolation
-
-1. **Start the app**:
+   For E2E tests, install Playwright browsers (one-time):
    ```bash
-   uv run src/app.py
+   uv run playwright install chromium
    ```
 
-2. **Open multiple browser tabs** (or separate browsers):
-   - Tab A: http://localhost:7860
-   - Tab B: http://localhost:7860
-   - Tab C: http://localhost:7860
+## Running Tests Locally
 
-3. **Test scenario**: Interleave conversations across tabs
-   - Tab A: "Hi, My name is Slartibartfast."
-   - Tab B: "Hi, how are you?"
-   - Tab A: "what is my name?"
-   - Tab B: "what is my name?"
+### Default (Unit + Integration)
+```bash
+# By default, E2E tests are excluded to avoid asyncio conflicts
+uv run pytest tests/ -v
+```
 
-4. **Verify**:
-   - ✅ Each tab maintains independent conversation history
-   - ✅ No information leaks between tabs -- tab B should say I don't know your name.
-   - ✅ Memory tool doesn't share state (different users in Memory graphs)
-   - ✅ Each session gets unique `session_id` in logs (check `uv run src/app.py` output)
+Runs unit and integration tests.
+
+### Unit Tests Only
+```bash
+uv run pytest tests/unit/ -v
+```
+
+Fast tests with no external dependencies.
+
+### Integration Tests Only
+```bash
+uv run pytest tests/integration/ -v
+```
+
+Async tests that call Groq/OpenAI APIs and test the full agent stack.
+
+### E2E Tests (Run Separately)
+```bash
+# E2E tests must run separately due to asyncio event loop isolation
+uv run pytest tests/e2e/ -v
+```
+
+Browser automation test that starts the app in a subprocess as Playwright manages its own event loops. Running E2E with async integration tests causes asyncio conflicts. 
+
+## Running Tests in Docker
+
+The Docker environment has all system dependencies and Playwright browsers pre-installed.
+
+### Unit + Integration Tests (Default)
+```bash
+# Run the default test service (unit + integration)
+docker compose run --rm test
+```
+
+### E2E Tests
+
+E2E tests use headless Chromium by default via Playwright, so they can run in Docker:
+
+```bash
+# Run E2E tests in Docker (uses headless Chromium)
+docker compose run --rm test uv run pytest tests/e2e/ -v
+```
+
+## With Code Coverage
+
+```bash
+# All tests with coverage report
+uv run pytest tests/ --cov=src --cov-report=term-missing -v
+
+# Generate HTML report
+uv run pytest tests/ --cov=src --cov-report=html
+open htmlcov/index.html
+```
+
+## E2E Test Details
+
+**Important**: E2E tests run in a separate pytest session from integration tests to avoid asyncio event loop conflicts. This is industry standard practice.
+
+The E2E test runs a single happy-path scenario:
+
+1. Starts the Gradio app in a subprocess on port 7870
+2. Launches a real Chromium browser via Playwright
+3. Sends realistic prompts:
+   - "Hi" → Greeting response
+   - "Do you have python experience?" → Python experience answer
+   - "What is the hardest thing you've ever done?" → Challenge story
+4. Verifies responses are substantive and error-free
+
+Run locally only:
+```bash
+uv run pytest tests/e2e/ -v
+```
+
+## Troubleshooting
+
+**Port already in use**:
+```bash
+lsof -ti :7870 | xargs kill -9
+```
+
+**Playwright not installed**:
+```bash
+uv run playwright install chromium
+```
+
+**App startup timeout**:
+- Check app logs for initialization errors
+- Ensure all environment variables are set
+- Increase `APP_STARTUP_TIMEOUT` in `tests/e2e/conftest.py` if needed
+
+## Advanced Debugging
+
+### View E2E Test Logs
+
+To see detailed logs from E2E tests (test steps, AI response sizes, etc.):
+
+```bash
+uv run pytest tests/e2e/ -v -s --log-cli-level=INFO --headed --browser=chromium
+```
+
+This shows:
+- When messages are sent to the AI
+- Response character counts
+- Test assertions as they pass/fail
+
+### Slow Motion Debugging
+
+Watch interactions in slow motion (2-second delays between actions):
+
+```bash
+PW_SLOW_MO=2000 uv run pytest tests/e2e/ -v -s --log-cli-level=INFO --headed --browser=chromium
+```
+
+### Interactive Debug Mode
+
+Use Playwright Inspector to step through the test:
+
+```bash
+PWDEBUG=1 uv run pytest tests/e2e/ -v --headed --browser=chromium
+```
+
+This opens the Playwright Inspector where you can pause, step through, and inspect the page.
+
 
 
