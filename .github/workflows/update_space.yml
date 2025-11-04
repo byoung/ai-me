@@ -14,8 +14,14 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Free disk space
+    - name: Free disk space (step 1 - hosted toolcache)
       run: rm -rf /opt/hostedtoolcache
+
+    - name: Free disk space (step 2 - apt cache)
+      run: sudo apt-get clean && sudo apt-get autoclean && sudo apt-get autoremove -y
+
+    - name: Free disk space (step 3 - docker images)
+      run: docker image prune -af --filter "until=24h"
 
     - name: Check disk space (before build)
       run: df -h

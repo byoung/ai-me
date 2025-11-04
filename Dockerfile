@@ -41,9 +41,14 @@ RUN uv sync --locked
 # Clean up Python cache files to reduce image size
 RUN find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
     find /app/.venv -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true && \
-    find /app/.venv -name "*.pyc" -delete && \
-    find /app/.venv -name "*.pyo" -delete && \
-    rm -rf /root/.cache
+    find /app/.venv -type f -name "*.pyc" -delete && \
+    find /app/.venv -type f -name "*.pyo" -delete && \
+    rm -rf /root/.cache && \
+    # Remove test files and docs from dependencies to save space
+    find /app/.venv -type d -name tests -exec rm -rf {} + 2>/dev/null || true && \
+    find /app/.venv -type d -name docs -exec rm -rf {} + 2>/dev/null || true && \
+    # Remove heavy files from torch if present
+    find /app/.venv -type f \( -name "*.so" -o -name "*.a" \) -path "*torch*" -exec rm -f {} + 2>/dev/null || true
 
 # ============================================================================
 # Production image - minimal footprint
