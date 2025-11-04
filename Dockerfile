@@ -47,8 +47,8 @@ RUN find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || t
     # Remove test files and docs from dependencies to save space
     find /app/.venv -type d -name tests -exec rm -rf {} + 2>/dev/null || true && \
     find /app/.venv -type d -name docs -exec rm -rf {} + 2>/dev/null || true && \
-    # Remove heavy files from torch if present
-    find /app/.venv -type f \( -name "*.so" -o -name "*.a" \) -path "*torch*" -exec rm -f {} + 2>/dev/null || true
+    # Remove NVIDIA CUDA libraries (not needed for inference, huge space waste)
+    find /app/.venv -type d -path "*nvidia*" -exec rm -rf {} + 2>/dev/null || true
 
 # ============================================================================
 # Production image - minimal footprint
@@ -70,19 +70,16 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && npm cache clean --force
 
+# Create non-root user BEFORE copying files (automatic ownership)
+RUN adduser -u 5678 --disabled-password --gecos "" appuser
+
 WORKDIR /app
 
-# Copy GitHub MCP server binary from builder
-COPY --from=builder /app/bin /app/bin
+# Copy files as the target user (automatic ownership, no chown needed)
+COPY --chown=appuser:appuser --from=builder /app/bin /app/bin
+COPY --chown=appuser:appuser --from=builder /app/.venv /app/.venv
+COPY --chown=appuser:appuser . /app
 
-# Copy venv from builder
-COPY --from=builder /app/.venv /app/.venv
-
-# Copy source code
-COPY . /app
-
-# Non-root user with access to /app
-RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
 USER appuser
 
 # ENTRYPOINT ensures uv is always the executor (mandatory)
