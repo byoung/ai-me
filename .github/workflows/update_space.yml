@@ -23,11 +23,13 @@ jobs:
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         GITHUB_PERSONAL_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        rm -rf ${{ github.workspace }}/htmlcov
         docker run --rm \
           -e OPENAI_API_KEY="${OPENAI_API_KEY}" \
           -e GROQ_API_KEY="${GROQ_API_KEY}" \
           -e GITHUB_PERSONAL_ACCESS_TOKEN="${GITHUB_PERSONAL_ACCESS_TOKEN}" \
           -v "${{ github.workspace }}/htmlcov:/app/htmlcov" \
+          --user 0 \
           --entrypoint uv \
           ai-me:test \
           run pytest tests/ -v --cov=src --cov-report=html --cov-report=term-missing
