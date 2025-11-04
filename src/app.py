@@ -131,6 +131,7 @@ if __name__ == "__main__":
             # Initialize session when page loads
             ui.load(get_session_status, inputs=[], outputs=[session_init])
 
-    # Read port from environment variable for E2E tests, default to 7860
+    # Read port and server address from environment variables for E2E tests
     server_port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
-    ui.launch(server_name="0.0.0.0", server_port=server_port, show_api=False)
+    server_name = os.getenv("GRADIO_SERVER_NAME", "0.0.0.0")
+    ui.launch(server_name=server_name, server_port=server_port, show_api=False)

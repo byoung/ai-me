@@ -1,9 +1,11 @@
-FROM mcr.microsoft.com/playwright:v1.48.0-noble
+FROM mcr.microsoft.com/playwright:v1.55.0-noble
 
 # Python runtime behavior
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/root/.local/bin:$PATH"
+# uv link mode: use copy instead of hardlinks (Docker volumes often don't support hardlinks)
+ENV UV_LINK_MODE=copy
 
 # Install uv, Python, git, and Node.js (for Memory MCP server via npx)
 RUN apt-get update \

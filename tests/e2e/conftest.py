@@ -34,7 +34,8 @@ def _port_is_open(host: str, port: int, timeout: float = 1.0) -> bool:
         result = sock.connect_ex((host, port))
         sock.close()
         return result == 0
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Port check failed for {host}:{port}: {e}")
         return False
 
 
@@ -51,6 +52,12 @@ class AppServer:
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
         env["GRADIO_SERVER_PORT"] = str(APP_PORT)
+        env["GRADIO_SERVER_NAME"] = APP_HOST  # Bind to 127.0.0.1 specifically
+
+        # Verify required environment variables are present
+        if "GROQ_API_KEY" not in env or not env["GROQ_API_KEY"]:
+            logger.error("GROQ_API_KEY is not set - app will fail to start")
+            raise EnvironmentError("GROQ_API_KEY environment variable is required")
 
         try:
             self.process = subprocess.Popen(
@@ -64,13 +71,16 @@ class AppServer:
             )
 
             # Print startup output to console for debugging
+            startup_lines = []
             def log_output():
                 if self.process and self.process.stdout:
-                    for i, line in enumerate(self.process.stdout):
-                        print(f"[APP] {line.rstrip()}")
+                    for line in self.process.stdout:
+                        line_stripped = line.rstrip()
+                        startup_lines.append(line_stripped)
+                        print(f"[APP] {line_stripped}")
                         # Signal ready when port appears in output
-                        if "7870" in line:
-                            logger.info(f"Port 7870 detected in output: {line.strip()}")
+                        if "7870" in line or "Running on" in line:
+                            logger.info(f"Port detection: {line_stripped}")
 
             threading.Thread(target=log_output, daemon=True).start()
 
@@ -82,6 +92,11 @@ class AppServer:
                     return
                 time.sleep(0.5)
 
+            # Timeout occurred - show what we captured
+            logger.error(f"Timeout waiting for port {APP_PORT} after {APP_STARTUP_TIMEOUT}s")
+            logger.error(f"Last 10 startup lines: {startup_lines[-10:]}")
+            if self.process:
+                logger.error(f"Process returncode: {self.process.returncode}")
             raise TimeoutError(
                 f"Port {APP_PORT} did not open within {APP_STARTUP_TIMEOUT}s"
             )
@@ -115,7 +130,17 @@ class AppServer:
 
 @pytest.fixture(scope="session")
 def app_server() -> Iterator[str]:
-    """Start the app server for the test session, yield URL to tests."""
+    """Start the app server for the test session, yield URL to tests.
+    
+    Skips E2E tests if GROQ_API_KEY is not available (graceful degradation for CI).
+    """
+    # Check for required environment variable
+    if not os.environ.get("GROQ_API_KEY"):
+        pytest.skip(
+            "GROQ_API_KEY not set - skipping E2E tests (normal in CI without API keys)",
+            allow_module_level=True
+        )
+    
     server = AppServer()
     server.start()
     time.sleep(1)  # Let it fully settle
