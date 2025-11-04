@@ -27,6 +27,7 @@ The constitution covers:
 - Use `uv` for all code execution (never `pip` directly, never manually activate venv)
 - Use `uv run` to execute scripts and commands, never bare `python` or shell activation
 - **NEVER use `tail`, `head`, `grep`, or similar output filters** — show full output always so you can see everything that's happening
+- **NEVER use `timeout` command** — macOS doesn't have it, user will kill hung processes manually
 - See `TESTING.md` for detailed test setup
 
 ## Common Gotchas & Reminders
@@ -35,3 +36,4 @@ The constitution covers:
 2. **VPN blocks Groq API**: If tests/app fail with 403 errors, disconnect from VPN
 3. **ChromaDB is ephemeral**: Using EphemeralClient means vectorstore rebuilds on each restart (stateless by design)
 4. **Package manager**: Use `uv` exclusively for this project; don't use `pip` directly
+5. **User is on macOS**: Never use GNU-specific commands (timeout, sed, etc.) without checking for macOS alternatives
