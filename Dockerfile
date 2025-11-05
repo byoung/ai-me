@@ -34,7 +34,7 @@ COPY . .
 RUN . /opt/venv/bin/activate && uv sync --locked
 
 # =============================================================================
-# Runtime Stage: Minimal image with Playwright support
+# Runtime Stage: Minimal production image
 # =============================================================================
 FROM python:3.12-slim AS runtime
 
@@ -45,11 +45,54 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     NO_CUDA=1 \
     CUDA_VISIBLE_DEVICES=""
 
-# Install runtime + Playwright dependencies
+# Install minimal runtime dependencies (Node.js required for MCP servers)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
-    # Playwright Chromium dependencies
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm cache clean --force
+
+# Install uv in runtime
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+# Create non-root user early
+RUN useradd -m -u 5678 appuser
+
+# Copy venv from builder (owned by root, read-only for appuser)
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy application code and do final sync as root
+WORKDIR /app
+COPY . .
+RUN uv sync --locked
+
+# Download GitHub MCP server binary (owned by root)
+RUN mkdir -p /app/bin && \
+    curl -L https://github.com/github/github-mcp-server/releases/download/v0.19.0/github-mcp-server_Linux_x86_64.tar.gz \
+    | tar -xz -C /app/bin && \
+    chmod +x /app/bin/github-mcp-server
+
+# Switch to non-root user for runtime (read-only access to everything)
+USER appuser
+
+# Use uv run with --no-sync since everything is locked down and read-only
+# This suppresses the sync that would occur WRT the ai-me package being editable
+ENTRYPOINT ["uv", "run", "--no-sync"]
+CMD ["src/app.py"]
+
+# ============================================================================
+# Test Stage - Extends runtime with dev dependencies for testing
+# ============================================================================
+FROM runtime AS test
+
+# Switch back to root to install test dependencies
+USER root
+
+# Install Playwright system dependencies for E2E tests
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libnss3 \
     libnspr4 \
     libatk1.0-0 \
@@ -65,44 +108,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     libpango-1.0-0 \
     libcairo2 \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/* \
-    && npm cache clean --force
-
-# Install uv in runtime
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
-
-# Create non-root user early
-RUN useradd -m -u 5678 appuser
-
-# Copy venv from builder with ownership
-COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
-
-# Download GitHub MCP server binary
-RUN mkdir -p /app/bin && \
-    curl -L https://github.com/github/github-mcp-server/releases/download/v0.19.0/github-mcp-server_Linux_x86_64.tar.gz \
-    | tar -xz -C /app/bin && \
-    chmod +x /app/bin/github-mcp-server && \
-    chown appuser:appuser /app/bin/github-mcp-server
-
-WORKDIR /app
-COPY --chown=appuser:appuser . .
-
-# Switch to non-root user for runtime
-USER appuser
-
-ENTRYPOINT ["uv", "run"]
-CMD ["src/app.py"]
-
-# ============================================================================
-# Test Stage - Extends runtime with dev dependencies for testing
-# ============================================================================
-FROM runtime AS test
-
-# Switch back to root to install test dependencies
-USER root
+    && rm -rf /var/lib/apt/lists/*
 
 # Install dev dependencies (playwright, pytest, etc.) into existing venv
 # Use UV_PROJECT_ENVIRONMENT to force uv to use /opt/venv instead of creating .venv
@@ -114,3 +120,9 @@ RUN /opt/venv/bin/python -m playwright install chromium
 
 # Switch back to appuser for test execution
 USER appuser
+
+# =============================================================================
+# Production Stage (default): Alias for runtime stage
+# This ensures Hugging Face Spaces uses the lean runtime image, not test
+# =============================================================================
+FROM runtime AS production
