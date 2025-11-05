@@ -54,9 +54,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && npm cache clean --force
 
-# Install uv in runtime
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
+# Install uv and uvx system-wide to /usr/local/bin so all users can run them
+RUN curl -LsSf https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/usr/local/bin sh
 
 # Create non-root user early
 RUN useradd -m -u 5678 appuser
