@@ -58,10 +58,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
-# Create non-root user early with writable home and temp directories
-RUN useradd -m -u 5678 appuser && \
-    mkdir -p /home/appuser/.cache /app/tmp && \
-    chown -R appuser:appuser /home/appuser /app/tmp
+# Create non-root user early
+RUN useradd -m -u 5678 appuser
 
 # Copy venv from builder (owned by root, read-only for appuser)
 COPY --from=builder /opt/venv /opt/venv
@@ -76,7 +74,10 @@ RUN mkdir -p /app/bin && \
     | tar -xz -C /app/bin && \
     chmod +x /app/bin/github-mcp-server
 
-# Switch to non-root user for runtime (read-only access to everything)
+# Give appuser ownership of /app/tmp directory for github repo checkouts
+RUN chown -R appuser:appuser /app/tmp
+
+# Switch to non-root user for runtime (read-only access to everything except tmp)
 USER appuser
 
 # Tell uv to use the existing venv in /opt/venv instead of creating .venv

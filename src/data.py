@@ -5,6 +5,7 @@ from local directories and GitHub repositories, chunking, and creating ChromaDB 
 import os
 import re
 import shutil
+from pathlib import Path
 from typing import List, Optional, Callable
 
 from pydantic import BaseModel, Field
@@ -151,12 +152,17 @@ class DataManager:
             file_filter = default_file_filter
         
         all_docs = []
-        # Clean up tmp directory before loading
-        tmp_dir = "./tmp"
+        # Use absolute path for tmp directory to avoid permission issues
+        tmp_dir = os.path.abspath("./tmp")
 
         if os.path.exists(tmp_dir) and cleanup_tmp:
             logger.info(f"Cleaning up existing tmp directory: {tmp_dir}")
-            shutil.rmtree(tmp_dir)
+            # Remove all top-level contents but keep the directory itself to preserve permissions
+            for item in Path(tmp_dir).glob("*"):
+                try:
+                    shutil.rmtree(item) if item.is_dir() else item.unlink()
+                except Exception as e:
+                    logger.warning(f"Could not remove {item}: {e}")
 
         # Use provided repos or default to empty list if none specified
         repos_to_load = repos if repos is not None else []
