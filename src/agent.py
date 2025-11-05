@@ -576,10 +576,14 @@ When formulating responses:
         run_config = RunConfig(tracing_disabled=True)
 
         try:
-            result: RunResult = await Runner.run(self._agent, 
-                                                 user_input, 
-                                                 run_config=run_config, 
-                                                 **runner_kwargs)
+            # Allow more turns for complex queries (default is 10)
+            result: RunResult = await Runner.run(
+                self._agent, 
+                user_input, 
+                run_config=run_config,
+                max_turns=20,
+                **runner_kwargs
+            )
         except Exception as e:
             error_str = str(e).lower()
 
