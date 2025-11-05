@@ -17,6 +17,15 @@ jobs:
     - name: Free disk space (hosted toolcache)
       run: rm -rf /opt/hostedtoolcache
 
+    - name: Check disk space (initial)
+      run: df -h
+
+    - name: Build test image (multi-stage build)
+      run: docker compose build test
+
+    - name: Check disk space (after build)
+      run: df -h
+
     - name: Run unit + integration tests in Docker
       env:
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

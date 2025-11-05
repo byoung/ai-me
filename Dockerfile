@@ -1,62 +1,114 @@
-FROM mcr.microsoft.com/playwright:v1.55.0-noble
+# =============================================================================
+# Builder Stage: Install dependencies and build wheels
+# =============================================================================
+FROM python:3.12-slim AS builder
 
-# Python runtime behavior
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
-# uv link mode: use copy instead of hardlinks (Docker volumes often don't support hardlinks)
-ENV UV_LINK_MODE=copy
-# Force CPU-only PyTorch (huge space savings - excludes CUDA libs)
-ENV TORCH_DEVICE=cpu
-ENV NO_CUDA=1
-ENV CUDA_VISIBLE_DEVICES=""
 
-# Install uv, Python, git, and Node.js (for Memory MCP server via npx)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl gnupg git git-lfs python3.12 python3.12-venv \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && mkdir -p /etc/apt/keyrings \
+WORKDIR /build
+
+# Copy dependency specifications
+COPY pyproject.toml uv.lock ./
+
+# Create venv and install ONLY production dependencies in builder
+RUN uv venv /opt/venv && \
+    . /opt/venv/bin/activate && \
+    uv sync --locked --no-install-project
+
+# Copy source and install project
+COPY . .
+RUN . /opt/venv/bin/activate && uv sync --locked
+
+# =============================================================================
+# Runtime Stage: Minimal image with Playwright support
+# =============================================================================
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    TORCH_DEVICE=cpu \
+    NO_CUDA=1 \
+    CUDA_VISIBLE_DEVICES=""
+
+# Install runtime + Playwright dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    # Playwright Chromium dependencies
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/* \
     && npm cache clean --force
 
-# Download official GitHub MCP server binary
-RUN mkdir -p /app/bin \
-    && curl -L https://github.com/github/github-mcp-server/releases/download/v0.19.0/github-mcp-server_Linux_x86_64.tar.gz \
-    | tar -xz -C /app/bin \
-    && chmod +x /app/bin/github-mcp-server
+# Install uv in runtime
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+# Create non-root user early
+RUN useradd -m -u 5678 appuser
+
+# Copy venv from builder with ownership
+COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
+
+# Download GitHub MCP server binary
+RUN mkdir -p /app/bin && \
+    curl -L https://github.com/github/github-mcp-server/releases/download/v0.19.0/github-mcp-server_Linux_x86_64.tar.gz \
+    | tar -xz -C /app/bin && \
+    chmod +x /app/bin/github-mcp-server && \
+    chown appuser:appuser /app/bin/github-mcp-server
 
 WORKDIR /app
+COPY --chown=appuser:appuser . .
 
-# Copy only dependency specifications for layer caching
-COPY pyproject.toml uv.lock ./
-
-# Create virtual environment and sync dependencies from lock file
-# --no-install-project defers building the local package until source is copied
-RUN uv venv && uv sync --locked --no-install-project
-
-# Now copy the complete source code
-COPY . /app
-
-# Sync again to install the local package (now that source is present)
-RUN uv sync --locked
-
-# Clean up Python cache to reduce layer size
-RUN find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
-    find /app/.venv -type f -name "*.pyc" -delete && \
-    find /app/.venv -type f -name "*.pyo" -delete && \
-    rm -rf /root/.cache && \
-    # Remove NVIDIA CUDA libraries from site-packages only (not the namespace)
-    find /app/.venv/lib/*/site-packages/nvidia -type d 2>/dev/null -exec rm -rf {} + 2>/dev/null || true && \
-    # Remove test directories from dependencies (not needed at runtime)
-    find /app/.venv/lib/*/site-packages -maxdepth 2 -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
-
-# Non-root user with access to /app
-RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
+# Switch to non-root user for runtime
 USER appuser
 
-# ENTRYPOINT ensures uv is always the executor (mandatory)
-# CMD provides the default argument (can be overridden)
 ENTRYPOINT ["uv", "run"]
 CMD ["src/app.py"]
+
+# ============================================================================
+# Test Stage - Extends runtime with dev dependencies for testing
+# ============================================================================
+FROM runtime AS test
+
+# Switch back to root to install test dependencies
+USER root
+
+# Install dev dependencies (playwright, pytest, etc.) into existing venv
+RUN . /opt/venv/bin/activate && uv sync --locked --group dev
+
+# Install Playwright browsers (now that playwright package is available)
+RUN /opt/venv/bin/python -m playwright install chromium
+
+# Switch back to appuser for test execution
+USER appuser

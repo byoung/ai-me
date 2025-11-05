@@ -1,10 +1,25 @@
 services:
-  browser:
-    image: mcr.microsoft.com/playwright:v1.55.0-noble
+  # Production runtime stage - minimal image with only production dependencies
+  runtime:
+    build:
+      context: .
+      target: runtime
+    volumes:
+      - ./:/app
+      - /app/.venv  # Anonymous volume for container's venv
+    ports:
+      - 7860:7860
+    working_dir: /app
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN:-}
+    command: ["src/app.py"]
 
+  # Notebooks stage - uses runtime with development tools
   notebooks:
-    build: .
-    # Mount source code but exclude .venv to avoid host/container conflicts
+    build:
+      context: .
+      target: test  # Uses test stage which has dev dependencies
     volumes:
       - ./:/app
       - /app/.venv  # Anonymous volume for container's venv
@@ -14,9 +29,11 @@ services:
     working_dir: /app
     user: "0:0"
 
+  # Test stage - extends runtime with dev dependencies and Playwright
   test:
-    build: .
-    # Mount source code but exclude .venv to avoid host/container conflicts
+    build:
+      context: .
+      target: test  # Explicitly build the test stage
     volumes:
       - ./:/app
       - /app/.venv  # Anonymous volume for container's venv
