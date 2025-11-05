@@ -74,8 +74,9 @@ RUN mkdir -p /app/bin && \
     | tar -xz -C /app/bin && \
     chmod +x /app/bin/github-mcp-server
 
-# Give appuser ownership of /app/tmp directory for github repo checkouts
-RUN chown -R appuser:appuser /app/tmp
+# Create tmp directory and give appuser ownership of /app
+RUN mkdir -p /app/tmp && \
+    chown -R appuser:appuser /app/tmp
 
 # Switch to non-root user for runtime (read-only access to everything except tmp)
 USER appuser
