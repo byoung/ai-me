@@ -350,6 +350,17 @@ class DataManager:
             except Exception:  # pragma: no cover
                 pass  # Collection doesn't exist yet
         
+        # Validate chunks - ChromaDB requires at least one document
+        if not chunks:
+            error_msg = (
+                "No documents loaded for vectorstore. Please configure document sources:\n"
+                "  1. Set GITHUB_REPOS environment variable (e.g., 'byoung/me,byoung/ai-me')\n"
+                "  2. Or place markdown files in the docs/local-testing/ directory\n"
+                "  3. Or configure DOC_ROOT and DOC_LOAD_LOCAL environment variables"
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         logger.info(f"Creating vectorstore with {len(chunks)} chunks...")
         vectorstore = Chroma.from_documents(
             documents=chunks,

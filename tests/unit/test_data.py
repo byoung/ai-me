@@ -83,6 +83,32 @@ class TestLoadLocalDocuments:
         assert len(docs) >= 3, "Expected at least 3 docs from test data"
 
 
+class TestCreateVectorstore:
+    """Tests for DataManager.create_vectorstore() method.
+    
+    Implements FR-002 (Knowledge Retrieval): Vectorstore creation with edge cases.
+    """
+
+    def test_create_vectorstore_rejects_empty_chunks(self):
+        """Tests FR-002: Reject empty chunks with clear error message.
+        
+        When no documents are provided, create_vectorstore should raise
+        ValueError with a clear message about how to configure document sources.
+        This prevents silent failures and provides actionable guidance.
+        """
+        config = DataManagerConfig()
+        dm = DataManager(config=config)
+        
+        # Should raise ValueError with clear message
+        with pytest.raises(ValueError) as exc_info:
+            dm.create_vectorstore(chunks=[], reset=True)
+        
+        error_message = str(exc_info.value)
+        assert "No documents loaded" in error_message, "Should explain the problem"
+        assert "GITHUB_REPOS" in error_message, "Should mention GITHUB_REPOS"
+        assert "docs/local-testing/" in error_message, "Should mention local docs path"
+
+
 class TestProcessDocuments:
     """Tests for DataManager.process_documents() method.
     

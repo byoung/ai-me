@@ -58,6 +58,17 @@ class AppServer:
         if "GROQ_API_KEY" not in env or not env["GROQ_API_KEY"]:
             logger.error("GROQ_API_KEY is not set - app will fail to start")
             raise EnvironmentError("GROQ_API_KEY environment variable is required")
+        
+        # Verify GITHUB_PERSONAL_ACCESS_TOKEN for loading GitHub repos
+        if "GITHUB_PERSONAL_ACCESS_TOKEN" not in env or not env["GITHUB_PERSONAL_ACCESS_TOKEN"]:
+            logger.error("GITHUB_PERSONAL_ACCESS_TOKEN is not set - app will fail to load documents")
+            raise EnvironmentError("GITHUB_PERSONAL_ACCESS_TOKEN environment variable is required")
+        
+        # Configure GITHUB_REPOS for E2E tests if not already set
+        # These repos are required for the agent to have knowledge to answer questions
+        if "GITHUB_REPOS" not in env or not env["GITHUB_REPOS"]:
+            env["GITHUB_REPOS"] = "byoung/me,byoung/ai-me"
+            logger.info(f"Setting GITHUB_REPOS for E2E tests: {env['GITHUB_REPOS']}")
 
         try:
             self.process = subprocess.Popen(
