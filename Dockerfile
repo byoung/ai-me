@@ -6,7 +6,8 @@ FROM python:3.12-slim AS builder
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_PROJECT_ENVIRONMENT=/opt/venv
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -24,14 +25,13 @@ WORKDIR /build
 # Copy dependency specifications
 COPY pyproject.toml uv.lock ./
 
-# Create venv and install ONLY production dependencies in builder
+# Create venv and install production dependencies
 RUN uv venv /opt/venv && \
-    . /opt/venv/bin/activate && \
     uv sync --locked --no-install-project
 
 # Copy source and install project
 COPY . .
-RUN . /opt/venv/bin/activate && uv sync --locked
+RUN uv sync --locked
 
 # =============================================================================
 # Runtime Stage: Minimal production image
@@ -58,16 +58,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
-# Create non-root user early
-RUN useradd -m -u 5678 appuser
+# Create non-root user early with writable home and temp directories
+RUN useradd -m -u 5678 appuser && \
+    mkdir -p /home/appuser/.cache /app/tmp && \
+    chown -R appuser:appuser /home/appuser /app/tmp
 
 # Copy venv from builder (owned by root, read-only for appuser)
 COPY --from=builder /opt/venv /opt/venv
 
-# Copy application code and do final sync as root
+# Copy application code
 WORKDIR /app
 COPY . .
-RUN uv sync --locked
 
 # Download GitHub MCP server binary (owned by root)
 RUN mkdir -p /app/bin && \
@@ -77,6 +78,9 @@ RUN mkdir -p /app/bin && \
 
 # Switch to non-root user for runtime (read-only access to everything)
 USER appuser
+
+# Tell uv to use the existing venv in /opt/venv instead of creating .venv
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 
 # Use uv run with --no-sync since everything is locked down and read-only
 # This suppresses the sync that would occur WRT the ai-me package being editable
