@@ -396,12 +396,20 @@ When formulating responses:
                 # Handle both GitHub and local documents
                 if 'github_repo' in doc.metadata:
                     github_repo = doc.metadata['github_repo']
-                    file_path = doc.metadata.get(
-                        'file_path',
-                        doc.metadata.get('source', 'unknown'),
-                    )
+                    source_path = doc.metadata.get('source', 'unknown')
+                    
+                    # Extract relative path from source by removing tmp/repo prefix
+                    # source_path format: /absolute/path/tmp/owner/repo/file.md
+                    # We need to extract just: file.md
+                    if 'tmp/' in source_path:
+                        # Split on 'tmp/' and take everything after repo name
+                        parts = source_path.split('tmp/')[-1].split('/', 2)  # ['owner', 'repo', 'path/file.md']
+                        file_path = parts[2] if len(parts) > 2 else source_path
+                    else:
+                        file_path = source_path
+                    
                     source_link = (
-                        f"https://github.com/{github_repo}/tree/main/"
+                        f"https://github.com/{github_repo}/blob/main/"
                         f"{file_path}\n"
                     )
                 else:
