@@ -105,7 +105,9 @@ FROM runtime AS test
 USER root
 
 # Install dev dependencies (playwright, pytest, etc.) into existing venv
-RUN . /opt/venv/bin/activate && uv sync --locked --group dev
+# Use UV_PROJECT_ENVIRONMENT to force uv to use /opt/venv instead of creating .venv
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+RUN uv sync --locked --group dev
 
 # Install Playwright browsers (now that playwright package is available)
 RUN /opt/venv/bin/python -m playwright install chromium
